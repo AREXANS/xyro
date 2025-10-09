@@ -5007,15 +5007,16 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
 end)
 
 -- =========================================================
--- ====== FITUR BARU: 🌿 ANTI LAG MODE (OPTIMIZE GAME) ======
+-- ====== FITUR BARU: OPTIMIZED GAME ======
 -- =========================================================
 task.defer(function()
     local Lighting = game:GetService("Lighting")
     local Workspace = game:GetService("Workspace")
     local RunService = game:GetService("RunService")
     local CoreGui = game:GetService("CoreGui")
+    local TweenService = game:GetService("TweenService")
 
-    local IsAntiLagEnabled = false
+    local IsOptimizedGameEnabled = false
     local storedProperties = {}
 
     local function scanAndDisableHeavyObjects()
@@ -5120,40 +5121,35 @@ task.defer(function()
         storedProperties = {}
     end
 
-    local function createButton()
+    local function createToggle(parent, name, initialState, callback)
+        local toggleFrame = Instance.new("Frame", parent); toggleFrame.Size = UDim2.new(1, 0, 0, 25); toggleFrame.BackgroundTransparency = 1; local toggleLabel = Instance.new("TextLabel", toggleFrame); toggleLabel.Size = UDim2.new(0.8, -10, 1, 0); toggleLabel.Position = UDim2.new(0, 5, 0, 0); toggleLabel.BackgroundTransparency = 1; toggleLabel.Text = name; toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); toggleLabel.TextSize = 12; toggleLabel.TextXAlignment = Enum.TextXAlignment.Left; toggleLabel.Font = Enum.Font.SourceSans
+        local switch = Instance.new("TextButton", toggleFrame); switch.Name = "Switch"; switch.Size = UDim2.new(0, 40, 0, 20); switch.Position = UDim2.new(1, -50, 0.5, -10); switch.BackgroundColor3 = Color3.fromRGB(50, 50, 50); switch.BorderSizePixel = 0; switch.Text = ""; local switchCorner = Instance.new("UICorner", switch); switchCorner.CornerRadius = UDim.new(1, 0)
+        local thumb = Instance.new("Frame", switch); thumb.Name = "Thumb"; thumb.Size = UDim2.new(0, 16, 0, 16); thumb.Position = UDim2.new(0, 2, 0.5, -8); thumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220); thumb.BorderSizePixel = 0; local thumbCorner = Instance.new("UICorner", thumb); thumbCorner.CornerRadius = UDim.new(1, 0)
+        local onColor, offColor = Color3.fromRGB(0, 150, 255), Color3.fromRGB(60, 60, 60); local onPosition, offPosition = UDim2.new(1, -18, 0.5, -8), UDim2.new(0, 2, 0.5, -8); local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out); local isToggled = initialState
+        local function updateVisuals(isInstant) local goalPosition, goalColor = isToggled and onPosition or offPosition, isToggled and onColor or offColor; if isInstant then thumb.Position, switch.BackgroundColor3 = goalPosition, goalColor else TweenService:Create(thumb, tweenInfo, {Position = goalPosition}):Play(); TweenService:Create(switch, tweenInfo, {BackgroundColor3 = goalColor}):Play() end end
+        switch.MouseButton1Click:Connect(function() isToggled = not isToggled; updateVisuals(false); callback(isToggled) end); updateVisuals(true)
+        return toggleFrame, switch
+    end
+
+    local function setupOptimizedGameToggle()
         local mainGui = CoreGui:FindFirstChild("ArexanstoolsGUI")
         if not mainGui then return end
         local settingsTab = mainGui:FindFirstChild("SettingsTab", true)
         if not settingsTab then return end
 
-        local button = Instance.new("TextButton")
-        button.Size = UDim2.new(1, 0, 0, 24)
-        button.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-        button.BorderSizePixel = 0
-        button.Text = "🌿 Anti Lag Mode: OFF"
-        button.TextColor3 = Color3.new(1, 1, 1)
-        button.Font = Enum.Font.SourceSansBold
-        button.TextSize = 12
-        button.Parent = settingsTab
-        local corner = Instance.new("UICorner", button)
-        corner.CornerRadius = UDim.new(0, 5)
-
-        button.MouseButton1Click:Connect(function()
-            IsAntiLagEnabled = not IsAntiLagEnabled
-            if IsAntiLagEnabled then
+        local toggleFrame, switch = createToggle(settingsTab, "Optimazed Game", IsOptimizedGameEnabled, function(state)
+            IsOptimizedGameEnabled = state
+            if state then
                 scanAndDisableHeavyObjects()
-                button.Text = "🌿 Anti Lag Mode: ON"
-                button.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
             else
                 restoreHeavyObjects()
-                button.Text = "🌿 Anti Lag Mode: OFF"
-                button.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
             end
         end)
+        toggleFrame.LayoutOrder = 10 -- Place it after the default items
     end
 
     task.wait(1)
-    createButton()
+    setupOptimizedGameToggle()
 end)
 
 -- =========================================================
@@ -5165,8 +5161,7 @@ end)
 -- =========================
 -- Arexans Tools — Patch v2 (Safe template for Roblox Studio)
 -- Adds:
--- 1) "Extra AntiLag" (merged) toggle in Settings tab
--- 2) "Dark Texture (Total)" toggle in Settings tab placed below Boost FPS (best-effort)
+-- 1) "Dark Texture" toggle in Settings tab placed below Boost FPS (best-effort)
 -- NOTE: This script is intended as a Studio/local script template. It performs only in-game changes
 -- under the authority of the place/server and is designed to be reversible and temporary.
 -- =========================
@@ -5179,6 +5174,7 @@ task.spawn(function()
     local Workspace = game:GetService("Workspace")
     local Terrain = Workspace:FindFirstChildOfClass("Terrain")
     local CollectionService = game:GetService("CollectionService")
+    local TweenService = game:GetService("TweenService")
 
     local function waitForMainGui(timeout)
         timeout = timeout or 10
@@ -5213,61 +5209,15 @@ task.spawn(function()
         return
     end
 
-    -- Helper matching existing style: create toggle frame similar to other toggles
-    local function createStyledToggle(parent, labelText, initialState, onToggle)
-        local container = Instance.new("Frame")
-        container.Size = UDim2.new(1, 0, 0, 28)
-        container.BackgroundTransparency = 1
-        container.LayoutOrder = parent:GetChildren() and (#parent:GetChildren() + 1) or 1
-        container.Parent = parent
-
-        local label = Instance.new("TextLabel", container)
-        label.Size = UDim2.new(0.68, 0, 1, 0)
-        label.Position = UDim2.new(0, 6, 0, 0)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.SourceSans
-        label.TextSize = 14
-        label.TextColor3 = Color3.fromRGB(220,220,220)
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Text = labelText
-
-        local toggle = Instance.new("TextButton", container)
-        toggle.Size = UDim2.new(0.28, -10, 0, 20)
-        toggle.Position = UDim2.new(0.72, 0, 0.1, 0)
-        toggle.AutoButtonColor = false
-        toggle.Font = Enum.Font.SourceSansBold
-        toggle.TextSize = 12
-        toggle.TextColor3 = Color3.new(1,1,1)
-        local corner = Instance.new("UICorner", toggle); corner.CornerRadius = UDim.new(0,6)
-        if initialState then
-            toggle.BackgroundColor3 = Color3.fromRGB(0,150,255)
-            toggle.Text = "ON"
-        else
-            toggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
-            toggle.Text = "OFF"
-        end
-
-        local state = initialState
-
-        local function setState(s, fire)
-            state = s and true or false
-            if state then
-                toggle.BackgroundColor3 = Color3.fromRGB(0,150,255)
-                toggle.Text = "ON"
-            else
-                toggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
-                toggle.Text = "OFF"
-            end
-            if fire and onToggle then
-                pcall(function() onToggle(state) end)
-            end
-        end
-
-        toggle.MouseButton1Click:Connect(function()
-            setState(not state, true)
-        end)
-
-        return container, function() return state end, setState
+    -- Helper for creating a toggle switch
+    local function createToggle(parent, name, initialState, callback)
+        local toggleFrame = Instance.new("Frame", parent); toggleFrame.Size = UDim2.new(1, 0, 0, 25); toggleFrame.BackgroundTransparency = 1; local toggleLabel = Instance.new("TextLabel", toggleFrame); toggleLabel.Size = UDim2.new(0.8, -10, 1, 0); toggleLabel.Position = UDim2.new(0, 5, 0, 0); toggleLabel.BackgroundTransparency = 1; toggleLabel.Text = name; toggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); toggleLabel.TextSize = 12; toggleLabel.TextXAlignment = Enum.TextXAlignment.Left; toggleLabel.Font = Enum.Font.SourceSans
+        local switch = Instance.new("TextButton", toggleFrame); switch.Name = "Switch"; switch.Size = UDim2.new(0, 40, 0, 20); switch.Position = UDim2.new(1, -50, 0.5, -10); switch.BackgroundColor3 = Color3.fromRGB(50, 50, 50); switch.BorderSizePixel = 0; switch.Text = ""; local switchCorner = Instance.new("UICorner", switch); switchCorner.CornerRadius = UDim.new(1, 0)
+        local thumb = Instance.new("Frame", switch); thumb.Name = "Thumb"; thumb.Size = UDim2.new(0, 16, 0, 16); thumb.Position = UDim2.new(0, 2, 0.5, -8); thumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220); thumb.BorderSizePixel = 0; local thumbCorner = Instance.new("UICorner", thumb); thumbCorner.CornerRadius = UDim.new(1, 0)
+        local onColor, offColor = Color3.fromRGB(0, 150, 255), Color3.fromRGB(60, 60, 60); local onPosition, offPosition = UDim2.new(1, -18, 0.5, -8), UDim2.new(0, 2, 0.5, -8); local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out); local isToggled = initialState
+        local function updateVisuals(isInstant) local goalPosition, goalColor = isToggled and onPosition or offPosition, isToggled and onColor or offColor; if isInstant then thumb.Position, switch.BackgroundColor3 = goalPosition, goalColor else TweenService:Create(thumb, tweenInfo, {Position = goalPosition}):Play(); TweenService:Create(switch, tweenInfo, {BackgroundColor3 = goalColor}):Play() end end
+        switch.MouseButton1Click:Connect(function() isToggled = not isToggled; updateVisuals(false); callback(isToggled) end); updateVisuals(true)
+        return toggleFrame, switch
     end
 
     -- Storage for originals to restore
@@ -5481,89 +5431,46 @@ task.spawn(function()
         modifiedParts = {}
     end
 
-    -- Extra AntiLag: merged implementation
-    local antiActive = false
-    local antiSaved = {particles = {}, decals = {}, lighting = {}}
-    local function applyExtraAntiLag()
-        if antiActive then return end
-        antiActive = true
-        -- lighting adjustments
-        pcall(function()
-            antiSaved.lighting.Ambient = Lighting.Ambient
-            antiSaved.lighting.OutdoorAmbient = Lighting.OutdoorAmbient
-            antiSaved.lighting.Brightness = Lighting.Brightness
-            Lighting.Ambient = Color3.fromRGB(200,200,200)
-            Lighting.OutdoorAmbient = Color3.fromRGB(160,160,160)
-            Lighting.Brightness = 1
-            Lighting.GlobalShadows = false
-        end)
-        -- disable particles and store states
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("ParticleEmitter") then
-                antiSaved.particles[obj] = obj.Enabled
-                obj.Enabled = false
-            elseif obj:IsA("Decal") or obj:IsA("Texture") then
-                antiSaved.decals[obj] = obj.Texture
-                obj.Texture = ""
-            end
-        end
-    end
-
-    local function restoreExtraAntiLag()
-        if not antiActive then return end
-        antiActive = false
-        pcall(function()
-            if antiSaved.lighting.Ambient then Lighting.Ambient = antiSaved.lighting.Ambient end
-            if antiSaved.lighting.OutdoorAmbient then Lighting.OutdoorAmbient = antiSaved.lighting.OutdoorAmbient end
-            if antiSaved.lighting.Brightness then Lighting.Brightness = antiSaved.lighting.Brightness end
-            Lighting.GlobalShadows = true
-        end)
-        for obj, val in pairs(antiSaved.particles) do
-            if obj and obj.Parent then pcall(function() obj.Enabled = val end) end
-        end
-        for obj, val in pairs(antiSaved.decals) do
-            if obj and obj.Parent then pcall(function() obj.Texture = val end) end
-        end
-        antiSaved = {particles = {}, decals = {}, lighting = {}}
-    end
-
     -- Find approximate position: try to place toggles below Boost FPS toggle if present
-    local function findBoostFpsIndex(parent)
+    local function findBoostFpsLayoutOrder(parent)
         for i, child in ipairs(parent:GetChildren()) do
-            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("Frame") then
-                if string.lower(child.Name):find("boost") or (child:IsA("TextButton") and child.Text and string.lower(child.Text):find("boost")) then
-                    return i
+            if child:IsA("Frame") then
+                local label = child:FindFirstChildOfClass("TextLabel")
+                if label and string.lower(label.Text or ""):find("boost fps") then
+                    return child.LayoutOrder
                 end
             end
         end
         return nil
     end
 
-    -- Create toggles
-    local extraAntiContainer, getAnti, setAnti = createStyledToggle(settingsTab, "Extra AntiLag", false, function(state)
-        if state then applyExtraAntiLag() else restoreExtraAntiLag() end
-    end)
-
     -- Place Dark Texture under Boost FPS if possible
-    local darkContainer, getDark, setDark = createStyledToggle(settingsTab, "Dark Texture (Total, temporary)", false, function(state)
+    local darkContainer, darkSwitch = createToggle(settingsTab, "Dark Texture", false, function(state)
         if state then applyDarkTotal() else restoreDarkTotal() end
     end)
 
     -- Attempt to reorder so darkContainer is below Boost FPS toggle
     pcall(function()
-        local children = settingsTab:GetChildren()
-        local boostIndex = findBoostFpsIndex(settingsTab)
-        if boostIndex then
-            -- set LayoutOrder values to position our containers after boostIndex
-            extraAntiContainer.LayoutOrder = boostIndex + 1
-            darkContainer.LayoutOrder = boostIndex + 2
+        local boostFpsOrder = findBoostFpsLayoutOrder(settingsTab)
+        if boostFpsOrder then
+            darkContainer.LayoutOrder = boostFpsOrder + 1
+        else
+            -- Fallback: find the "Optimazed Game" button and place it under that
+            for _, child in ipairs(settingsTab:GetChildren()) do
+                if child:IsA("Frame") then
+                     local label = child:FindFirstChildOfClass("TextLabel")
+                     if label and string.lower(label.Text or ""):find("optimazed game") then
+                        darkContainer.LayoutOrder = child.LayoutOrder + 1
+                        break
+                    end
+                end
+            end
         end
     end)
 
     -- Cleanup on GUI removal or game close
     local function cleanup()
         restoreDarkTotal()
-        restoreExtraAntiLag()
     end
 
     settingsTab.AncestryChanged:Connect(function(_, parent)
