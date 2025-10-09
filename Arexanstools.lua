@@ -3814,11 +3814,11 @@ task.spawn(function()
         createButton(SettingsTabContent, "Hop Server", function() HopServer() end).LayoutOrder = 4
         createToggle(SettingsTabContent, "Anti-Lag", IsAntiLagEnabled, ToggleAntiLag).LayoutOrder = 5
         createToggle(SettingsTabContent, "Boost FPS", IsBoostFPSEnabled, ToggleBoostFPS).LayoutOrder = 6
-        createToggle(SettingsTabContent, "Shift Lock", IsShiftLockEnabled, ToggleShiftLock).LayoutOrder = 7
-        createButton(SettingsTabContent, "Tutup", CloseScript).LayoutOrder = 8
+        createToggle(SettingsTabContent, "Shift Lock", IsShiftLockEnabled, ToggleShiftLock).LayoutOrder = 9
+        createButton(SettingsTabContent, "Tutup", CloseScript).LayoutOrder = 10
     
         local logoutButton = createButton(SettingsTabContent, "Logout", HandleLogout)
-        logoutButton.LayoutOrder = 9
+        logoutButton.LayoutOrder = 11
         logoutButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 
@@ -5145,7 +5145,7 @@ task.defer(function()
                 restoreHeavyObjects()
             end
         end)
-        toggleFrame.LayoutOrder = 10 -- Place it after the default items
+        toggleFrame.LayoutOrder = 8 -- Place it after the default items
     end
 
     task.wait(1)
@@ -5449,24 +5449,7 @@ task.spawn(function()
         if state then applyDarkTotal() else restoreDarkTotal() end
     end)
 
-    -- Attempt to reorder so darkContainer is below Boost FPS toggle
-    pcall(function()
-        local boostFpsOrder = findBoostFpsLayoutOrder(settingsTab)
-        if boostFpsOrder then
-            darkContainer.LayoutOrder = boostFpsOrder + 1
-        else
-            -- Fallback: find the "Optimazed Game" button and place it under that
-            for _, child in ipairs(settingsTab:GetChildren()) do
-                if child:IsA("Frame") then
-                     local label = child:FindFirstChildOfClass("TextLabel")
-                     if label and string.lower(label.Text or ""):find("optimazed game") then
-                        darkContainer.LayoutOrder = child.LayoutOrder + 1
-                        break
-                    end
-                end
-            end
-        end
-    end)
+    darkContainer.LayoutOrder = 7
 
     -- Cleanup on GUI removal or game close
     local function cleanup()
