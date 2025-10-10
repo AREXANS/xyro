@@ -3815,7 +3815,7 @@ task.spawn(function()
         createToggle(SettingsTabContent, "Anti-Lag", IsAntiLagEnabled, ToggleAntiLag).LayoutOrder = 5
         createToggle(SettingsTabContent, "Boost FPS", IsBoostFPSEnabled, ToggleBoostFPS).LayoutOrder = 6
         createToggle(SettingsTabContent, "Shift Lock", IsShiftLockEnabled, ToggleShiftLock).LayoutOrder = 9
-        createButton(SettingsTabContent, "Tutup", CloseScript).LayoutOrder = 10
+        createButton(SettingsTabContent, "Tutup", CloseScript).LayoutOrder = 11
     
         local logoutButton = createButton(SettingsTabContent, "Logout", HandleLogout)
         logoutButton.LayoutOrder = 11
@@ -5137,7 +5137,7 @@ task.defer(function()
         local settingsTab = mainGui:FindFirstChild("SettingsTab", true)
         if not settingsTab then return end
 
-        local toggleFrame, switch = createToggle(settingsTab, "Optimazed Game", IsOptimizedGameEnabled, function(state)
+        local toggleFrame, switch = createToggle(settingsTab, "Optimized Game", IsOptimizedGameEnabled, function(state)
             IsOptimizedGameEnabled = state
             if state then
                 scanAndDisableHeavyObjects()
