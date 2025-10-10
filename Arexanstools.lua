@@ -1,3 +1,235 @@
+
+
+--[[
+🔥 PATCH v3 FINAL: Smooth Playback, Jump Sync, Pause Natural
+============================================================
+- Transisi antar rekaman halus tanpa gerakan kaku.
+- Animasi lompat dan jatuh sinkron dengan perubahan posisi frame.
+- Pause/Resume bekerja alami tanpa freeze/stuck, karakter diam sementara.
+- Kecepatan langkah kaki (WalkSpeed) otomatis menyesuaikan jarak antar frame.
+- Bypass Animation tetap berjalan lancar dan sinkron.
+--]]
+
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local isSmoothPaused = false
+local lastFrame, nextFrame
+
+local function smoothReset(rootPart)
+    if not rootPart then return end
+    local alignPos = rootPart:FindFirstChild("PlaybackAlignPos")
+    local alignOri = rootPart:FindFirstChild("PlaybackAlignOri")
+    if alignPos then
+        alignPos.Position = rootPart.Position
+        alignPos.Responsiveness = 150
+    end
+    if alignOri then
+        alignOri.CFrame = rootPart.CFrame
+        alignOri.Responsiveness = 150
+    end
+end
+
+function pausePlayback()
+    isPaused = true
+    isSmoothPaused = true
+    local char = game.Players.LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:Move(Vector3.new(0,0,0))
+            humanoid:ChangeState(Enum.HumanoidStateType.Idle)
+            humanoid.WalkSpeed = 0
+        end
+    end
+end
+
+function resumePlayback()
+    isPaused = false
+    task.wait(0.05)
+    isSmoothPaused = false
+end
+
+function playNextRecording()
+    if nextRecordingIndex then
+        local char = game.Players.LocalPlayer.Character
+        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+        if rootPart then smoothReset(rootPart) end
+        task.wait(0.15)
+        playRecording(nextRecordingIndex)
+    end
+end
+
+-- Playback Loop Baru
+task.spawn(function()
+    RunService.RenderStepped:Connect(function(dt)
+        if isPaused or isSmoothPaused then return end
+        local player = game.Players.LocalPlayer
+        local char = player.Character
+        if not char then return end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        if humanoid and rootPart and currentFrame and nextFrame then
+            local cf1 = CFrame.new(unpack(currentFrame.cframe))
+            local cf2 = CFrame.new(unpack(nextFrame.cframe))
+            local pos1, pos2 = cf1.Position, cf2.Position
+            local dist = (pos2 - pos1).Magnitude
+            local timeDelta = math.max(nextFrame.time - currentFrame.time, 0.016)
+            local dynamicSpeed = math.clamp((dist / timeDelta) * 1.15, 6, 22)
+            humanoid.WalkSpeed = dynamicSpeed
+
+            -- Tangani animasi lompat alami
+            local heightDelta = pos2.Y - pos1.Y
+            if heightDelta > 2 then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            elseif heightDelta < -2 then
+                humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+            else
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end
+
+            -- Interpolasi halus posisi & orientasi
+            local alpha = math.clamp(dt / timeDelta, 0, 1)
+            local newCF = cf1:Lerp(cf2, alpha * 0.3 + 0.7)
+            rootPart.CFrame = rootPart.CFrame:Lerp(newCF, 0.35)
+
+            -- ✅ Dynamic FE Run Sync Patch v5 (Smooth & Realistic)
+if isAnimationBypassEnabled then
+    -- Hitung kecepatan aktual dari rekaman
+    local bypassSpeed = math.clamp((dist / timeDelta) * 1.15, 10, 30)
+    humanoid.WalkSpeed = bypassSpeed
+
+    -- Tentukan state sesuai gerakan vertikal
+    if heightDelta > 2 then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    elseif heightDelta < -2 then
+        humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+    else
+        humanoid:ChangeState(Enum.HumanoidStateType.Running)
+    end
+
+    -- Posisi target dengan prediksi arah
+    local nextPos = newCF.Position + rootPart.CFrame.LookVector * 0.05
+
+    -- Tambahkan sedikit dorongan velocity agar animasi sinkron
+    local moveDir = (pos2 - pos1).Unit
+    rootPart.Velocity = moveDir * bypassSpeed * 1.1
+
+    -- Jalankan MoveTo agar server mengupdate posisi (FE)
+    humanoid:MoveTo(nextPos)
+
+    -- Perbaiki AlignPos agar tidak delay
+    local alignPos = rootPart:FindFirstChild("PlaybackAlignPos")
+    if alignPos then
+        alignPos.Position = nextPos
+        alignPos.Responsiveness = 500
+    end
+
+    -- Tambahan: paksa animasi “running” aktif
+    if humanoid:FindFirstChild("Animator") then
+        local animator = humanoid.Animator
+        for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+            if track.Name:lower():find("run") then
+                track:AdjustSpeed(math.clamp(bypassSpeed / 16, 0.8, 2.2))
+            end
+        end
+    end
+end
+        end
+    end)
+end)
+
+
+
+--[[
+🔥 PATCH v2: Smooth Multi-Playback & Pause/Resume Fix
+===================================================
+- Peralihan antar rekaman sekarang halus, tanpa reset mendadak.
+- Pause/Resume kini menjaga posisi dan physics karakter agar tidak freeze atau teleport.
+- Kecepatan langkah (WalkSpeed) disesuaikan ulang setiap kali lanjut atau ganti rekaman.
+- Penambahan fungsi smoothReset(), pausePlayback(), resumePlayback(), dan playNextRecording().
+--]]
+
+local isSmoothPaused = false
+
+local function smoothReset(rootPart)
+    if not rootPart then return end
+    local alignPos = rootPart:FindFirstChild("PlaybackAlignPos")
+    local alignOri = rootPart:FindFirstChild("PlaybackAlignOri")
+    if alignPos then
+        alignPos.Position = rootPart.Position
+        alignPos.Responsiveness = 100
+    end
+    if alignOri then
+        alignOri.CFrame = rootPart.CFrame
+        alignOri.Responsiveness = 100
+    end
+end
+
+function pausePlayback()
+    isPaused = true
+    isSmoothPaused = true
+    local char = game.Players.LocalPlayer.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        if humanoid then
+            humanoid:Move(Vector3.new(0,0,0))
+            humanoid.WalkSpeed = 0
+        end
+        if rootPart then smoothReset(rootPart) end
+    end
+end
+
+function resumePlayback()
+    isPaused = false
+    task.wait(0.05)
+    isSmoothPaused = false
+end
+
+function playNextRecording()
+    if nextRecordingIndex then
+        local char = game.Players.LocalPlayer.Character
+        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+        if rootPart then smoothReset(rootPart) end
+        task.wait(0.1)
+        playRecording(nextRecordingIndex)
+    end
+end
+
+-- Integrasi ke playback utama (disisipkan di loop RunService.RenderStepped)
+task.spawn(function()
+    local RunService = game:GetService("RunService")
+    RunService.RenderStepped:Connect(function(dt)
+        if isPaused or isSmoothPaused then return end
+        local player = game.Players.LocalPlayer
+        local char = player.Character
+        if not char then return end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        if humanoid and rootPart and currentFrame and nextFrame then
+            local distanceDelta = (CFrame.new(unpack(nextFrame.cframe)).Position - CFrame.new(unpack(currentFrame.cframe)).Position).Magnitude
+            local timeDelta = math.max(nextFrame.time - currentFrame.time, 0.001)
+            local dynamicSpeed = math.clamp(distanceDelta / timeDelta * 1.2, 6, 20)
+            humanoid.WalkSpeed = dynamicSpeed
+            local alpha = math.clamp(dt / timeDelta, 0, 1)
+            local interpolatedCFrame = CFrame.new(unpack(currentFrame.cframe)):Lerp(CFrame.new(unpack(nextFrame.cframe)), alpha)
+            rootPart.CFrame = rootPart.CFrame:Lerp(interpolatedCFrame, 0.25)
+        end
+    end)
+end)
+
+
+
+--[[
+🔥 PATCH: Playback Rekaman Halus & Kecepatan Dinamis
+===================================================
+- Animasi rekaman kini tidak kaku (interpolasi posisi halus).
+- Kecepatan langkah kaki (WalkSpeed humanoid) otomatis mengikuti kecepatan gerak rekaman.
+- Saat pause/jeda playback, karakter diam secara natural tanpa freeze/stuck.
+- Bypass Animation kini ikut menyesuaikan kecepatan gerak dan arah.
+--]]
+
 function promptInput(message)
     local input = ""
     local done = false
@@ -5462,3 +5694,156 @@ task.spawn(function()
     game:BindToClose(function() cleanup() end)
 
 end)
+
+
+
+
+-- =========================
+-- ArexansTools Playback Fix (Merged Override)
+-- Replaces old playback/pause/resume/playNextRecording implementations
+-- to ensure smooth multi-recording playback and correct pause behaviour.
+-- This block intentionally placed at end so it overrides previous definitions.
+-- =========================
+
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+
+local _player = Players.LocalPlayer
+-- ensure globals used by original script are available; override if needed
+isPaused = isPaused or false
+isSmoothPaused = isSmoothPaused or false
+currentFrame = currentFrame or nil
+nextFrame = nextFrame or nil
+nextRecordingIndex = nextRecordingIndex or nil
+isAnimationBypassEnabled = isAnimationBypassEnabled or false
+
+local function smoothReset(rootPart)
+    if not rootPart then return end
+    local alignPos = rootPart:FindFirstChild("PlaybackAlignPos")
+    local alignOri = rootPart:FindFirstChild("PlaybackAlignOri")
+    if alignPos then
+        alignPos.Position = rootPart.Position
+        alignPos.Responsiveness = 150
+    end
+    if alignOri then
+        alignOri.CFrame = rootPart.CFrame
+        alignOri.Responsiveness = 150
+    end
+end
+
+-- Override global functions used by UI/other parts
+function pausePlayback()
+    isPaused = true
+    isSmoothPaused = true
+    local char = _player and _player.Character
+    if char then
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        if humanoid then
+            -- stop movement but keep physics stable
+            pcall(function()
+                humanoid:Move(Vector3.new(0,0,0))
+                humanoid.WalkSpeed = 0
+                humanoid:ChangeState(Enum.HumanoidStateType.Idle)
+            end)
+        end
+        if rootPart then
+            -- gently snap aligners to current position to avoid stuck interpolation
+            pcall(function() smoothReset(rootPart) end)
+        end
+    end
+end
+
+function resumePlayback()
+    if not isPaused then
+        return
+    end
+    -- small delay to allow physics to stabilise
+    task.wait(0.05)
+    isSmoothPaused = false
+    isPaused = false
+end
+
+function playNextRecording()
+    if not nextRecordingIndex then return end
+    -- Reset frame pointers to avoid lingering references from previous recording
+    currentFrame = nil
+    nextFrame = nil
+    isPaused = false
+    isSmoothPaused = false
+
+    local char = _player and _player.Character
+    local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+    if rootPart then pcall(function() smoothReset(rootPart) end) end
+    task.wait(0.18)
+    -- call existing playRecording function (should be defined earlier in the file)
+    if type(playRecording) == "function" then
+        pcall(function() playRecording(nextRecordingIndex) end)
+    else
+        warn("[ArexansTools] playRecording() not found when calling playNextRecording()")
+    end
+end
+
+-- Main smooth playback loop that will override previous loops
+do
+    -- disconnect previous connection if it exists (best-effort: tries to find stored connection variable)
+    if playbackConnection and type(playbackConnection.Disconnect) == "function" then
+        pcall(function() playbackConnection:Disconnect() end)
+    end
+
+    playbackConnection = RunService.RenderStepped:Connect(function(dt)
+        if isPaused or isSmoothPaused then return end
+        if not _player then return end
+        local char = _player.Character
+        if not char then return end
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local rootPart = char:FindFirstChild("HumanoidRootPart")
+        if humanoid and rootPart and currentFrame and nextFrame then
+            local ok, cf1 = pcall(function() return CFrame.new(unpack(currentFrame.cframe)) end)
+            local ok2, cf2 = pcall(function() return CFrame.new(unpack(nextFrame.cframe)) end)
+            if not ok or not ok2 or not cf1 or not cf2 then return end
+
+            local pos1, pos2 = cf1.Position, cf2.Position
+            local dist = (pos2 - pos1).Magnitude
+            local timeDelta = math.max((nextFrame.time or 0) - (currentFrame.time or 0), 0.016)
+            local dynamicSpeed = math.clamp((dist / timeDelta) * 1.15, 6, 22)
+
+            -- apply movement speed
+            pcall(function() humanoid.WalkSpeed = dynamicSpeed end)
+
+            -- handle jump/freefall states based on vertical delta
+            local heightDelta = pos2.Y - pos1.Y
+            if heightDelta > 2 then
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end)
+            elseif heightDelta < -2 then
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Freefall) end)
+            else
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end)
+            end
+
+            -- smooth interpolation
+            local alpha = math.clamp(dt / timeDelta, 0, 1)
+            local targetCF = cf1:Lerp(cf2, alpha)
+            rootPart.CFrame = rootPart.CFrame:Lerp(targetCF, 0.35)
+
+            -- manual sync when bypass enabled
+            if isAnimationBypassEnabled then
+                pcall(function() humanoid:MoveTo(targetCF.Position) end)
+            end
+
+            -- if nextFrame marks last frame, auto-play next recording
+            if nextFrame.isLast and nextRecordingIndex then
+                -- small debounce to avoid recursive call within same frame
+                local idx = nextRecordingIndex
+                task.defer(function()
+                    if nextRecordingIndex == idx then
+                        pcall(playNextRecording)
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+print("[ArexansTools] Merged playback fix appended - overrides loaded.")
