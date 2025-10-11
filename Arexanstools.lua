@@ -666,8 +666,33 @@ task.spawn(function()
     local GUI_POSITIONS_SAVE_FILE = SAVE_FOLDER .. "/ArexansTools_GuiPositions_" .. tostring(game.PlaceId) .. ".json"
     local FEATURE_STATES_SAVE_FILE = SAVE_FOLDER .. "/ArexansTools_FeatureStates_" .. tostring(game.PlaceId) .. ".json"
     local ANIMATION_SAVE_FILE = SAVE_FOLDER .. "/ArexansTools_Animations.json"
+    local EMOTE_FAVORITES_SAVE_FILE = SAVE_FOLDER .. "/EmoteFavorites.json" -- [[ PERUBAHAN BARU ]]
     local RECORDING_SAVE_FILE = SAVE_FOLDER .. "/ArexansTools_Recordings_" .. tostring(game.PlaceId) .. ".json" -- [[ PERUBAHAN BARU ]]
     local SESSION_SAVE_FILE = SAVE_FOLDER .. "/ArexansTools_Session.json"
+
+    -- [[ PERUBAHAN BARU: Variabel dan fungsi untuk favorit emote ]]
+    local favoriteEmotes = {}
+
+    local function saveFavorites()
+        if not writefile then return end
+        pcall(function()
+            writefile(EMOTE_FAVORITES_SAVE_FILE, HttpService:JSONEncode(favoriteEmotes))
+        end)
+    end
+
+    local function loadFavorites()
+        if not readfile or not isfile or not isfile(EMOTE_FAVORITES_SAVE_FILE) then return end
+        local success, result = pcall(function()
+            local content = readfile(EMOTE_FAVORITES_SAVE_FILE)
+            local data = HttpService:JSONDecode(content)
+            if type(data) == "table" then
+                favoriteEmotes = data
+            end
+        end)
+        if not success then
+            warn("Gagal memuat favorit emote:", result)
+        end
+    end
 
     -- [[ PERUBAHAN BARU: Fungsi untuk mengelola sesi login dipindahkan ke lingkup luar ]]
     local function saveSession(expirationTimestamp)
@@ -1617,6 +1642,8 @@ task.spawn(function()
         local EmoteList = {}
         local currentTrack = nil
         local currentAnimId = nil
+        local favoriteFilterState = 1 -- 1: All, 2: Starred, 3: Not Starred
+        loadFavorites() -- Muat favorit di awal
 
         local TempEmoteGui = Instance.new("ScreenGui")
         TempEmoteGui.Name = "EmoteGuiRevised"
@@ -1682,6 +1709,48 @@ task.spawn(function()
         
         MakeDraggable(EmoteMainFrame, Header, function() return true end, nil)
 
+        -- [[ PERUBAHAN BARU: Pegangan untuk mengubah ukuran jendela emote ]]
+        local EmoteResizeHandle = Instance.new("TextButton")
+        EmoteResizeHandle.Name = "EmoteResizeHandle"
+        EmoteResizeHandle.Text = ""
+        EmoteResizeHandle.Size = UDim2.new(0, 15, 0, 15)
+        EmoteResizeHandle.Position = UDim2.new(1, -15, 1, -15)
+        EmoteResizeHandle.BackgroundColor3 = Color3.fromRGB(90, 150, 255)
+        EmoteResizeHandle.BackgroundTransparency = 0.5
+        EmoteResizeHandle.BorderSizePixel = 0
+        EmoteResizeHandle.ZIndex = 2 -- Pastikan di atas konten lain
+        EmoteResizeHandle.Parent = EmoteMainFrame
+
+        -- [[ PERUBAHAN BARU: Logika untuk mengubah ukuran jendela emote ]]
+        ConnectEvent(EmoteResizeHandle.InputBegan, function(input)
+            if not (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then return end
+
+            local isResizing = true
+            local initialMousePosition = UserInputService:GetMouseLocation()
+            local initialFrameSize = EmoteMainFrame.AbsoluteSize
+
+            local inputChangedConnection
+            local inputEndedConnection
+
+            inputChangedConnection = UserInputService.InputChanged:Connect(function(changedInput)
+                if isResizing and (changedInput.UserInputType == Enum.UserInputType.MouseMovement or changedInput.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = UserInputService:GetMouseLocation() - initialMousePosition
+                    local newSizeX = math.max(160, initialFrameSize.X + delta.X) -- Ukuran minimum
+                    local newSizeY = math.max(180, initialFrameSize.Y + delta.Y) -- Ukuran minimum
+                    EmoteMainFrame.Size = UDim2.new(0, newSizeX, 0, newSizeY)
+                end
+            end)
+
+            inputEndedConnection = UserInputService.InputEnded:Connect(function(endedInput)
+                if endedInput.UserInputType == input.UserInputType then
+                    isResizing = false
+                    if inputChangedConnection then inputChangedConnection:Disconnect() end
+                    if inputEndedConnection then inputEndedConnection:Disconnect() end
+                    saveGuiPositions() -- Simpan ukuran baru setelah selesai
+                end
+            end)
+        end)
+
         local SearchBox = Instance.new("TextBox")
         SearchBox.Name = "SearchBox"
         SearchBox.Size = UDim2.new(1, -20, 0, 25)
@@ -1697,10 +1766,59 @@ task.spawn(function()
         local SearchCorner = Instance.new("UICorner", SearchBox); SearchCorner.CornerRadius = UDim.new(0, 6)
         local SearchPadding = Instance.new("UIPadding", SearchBox); SearchPadding.PaddingLeft = UDim.new(0, 10); SearchPadding.PaddingRight = UDim.new(0, 10)
 
+        -- [[ PERUBAHAN BARU: Frame untuk tombol filter ]]
+        local FilterFrame = Instance.new("Frame")
+        FilterFrame.Name = "FilterFrame"
+        FilterFrame.Size = UDim2.new(1, -20, 0, 25)
+        FilterFrame.Position = UDim2.new(0, 10, 0, 65)
+        FilterFrame.BackgroundTransparency = 1
+        FilterFrame.Parent = EmoteMainFrame
+
+        local FilterLayout = Instance.new("UIListLayout", FilterFrame)
+        FilterLayout.FillDirection = Enum.FillDirection.Horizontal
+        FilterLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        FilterLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        FilterLayout.Padding = UDim.new(0, 5)
+
+        local filterButtons = {}
+        local function createFilterButton(text, state)
+            local button = Instance.new("TextButton", FilterFrame)
+            button.Name = text .. "FilterButton"
+            button.Size = UDim2.new(0.33, -5, 1, 0)
+            button.Font = Enum.Font.SourceSansBold
+            button.Text = text
+            button.TextSize = 12
+            local btnCorner = Instance.new("UICorner", button); btnCorner.CornerRadius = UDim.new(0, 4)
+            table.insert(filterButtons, {button=button, state=state})
+            return button
+        end
+
+        local allButton = createFilterButton("[Semua]", 1)
+        local favButton = createFilterButton("[Favorite]", 2)
+        local unfavButton = createFilterButton("[Unfavorite]", 3)
+
+        local function updateFilterButtons()
+            for _, btnInfo in ipairs(filterButtons) do
+                local isActive = (btnInfo.state == favoriteFilterState)
+                btnInfo.button.BackgroundColor3 = isActive and Color3.fromRGB(90, 150, 255) or Color3.fromRGB(48, 63, 90)
+                btnInfo.button.TextColor3 = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 190, 210)
+            end
+        end
+
+        for _, btnInfo in ipairs(filterButtons) do
+            btnInfo.button.MouseButton1Click:Connect(function()
+                favoriteFilterState = btnInfo.state
+                updateFilterButtons()
+                populateEmotes(SearchBox.Text)
+            end)
+        end
+        
+        updateFilterButtons() -- Set initial state
+
         local EmoteArea = Instance.new("ScrollingFrame")
         EmoteArea.Name = "EmoteArea"
-        EmoteArea.Size = UDim2.new(1, 0, 1, -70)
-        EmoteArea.Position = UDim2.new(0, 0, 0, 65)
+        EmoteArea.Size = UDim2.new(1, 0, 1, -100) -- Disesuaikan untuk filter bar
+        EmoteArea.Position = UDim2.new(0, 0, 0, 95) -- Disesuaikan untuk filter bar
         EmoteArea.BackgroundTransparency = 1
         EmoteArea.BorderSizePixel = 0
         EmoteArea.ScrollBarImageColor3 = Color3.fromRGB(90, 150, 255)
@@ -1740,19 +1858,77 @@ task.spawn(function()
         end
 
         local function createEmoteButton(emoteData)
-            local button = Instance.new("ImageButton"); button.Name = emoteData.name; button.BackgroundColor3 = Color3.fromRGB(48, 63, 90); button.Size = UDim2.new(0, 36, 0, 50); button.Parent = EmoteArea
+            local container = Instance.new("Frame")
+            container.Name = emoteData.name
+            container.Size = UDim2.new(0, 36, 0, 50)
+            container.BackgroundTransparency = 1
+            container.Parent = EmoteArea
+
+            local button = Instance.new("ImageButton", container)
+            button.Name = "EmoteImageButton"
+            button.BackgroundColor3 = Color3.fromRGB(48, 63, 90)
+            button.Size = UDim2.new(1, 0, 1, 0)
             local corner = Instance.new("UICorner", button); corner.CornerRadius = UDim.new(0, 6)
-            local image = Instance.new("ImageLabel", button); image.Size = UDim2.new(1, -4, 0, 32); image.Position = UDim2.new(0.5, 0, 0, 3); image.AnchorPoint = Vector2.new(0.5, 0); image.BackgroundTransparency = 1; image.Image = "rbxthumb://type=Asset&id=" .. tostring(emoteData.id) .. "&w=420&h=420"
-            local nameLabel = Instance.new("TextLabel", button); nameLabel.Size = UDim2.new(1, -4, 0, 12); nameLabel.Position = UDim2.new(0, 2, 0, 36); nameLabel.BackgroundTransparency = 1; nameLabel.Font = Enum.Font.Gotham; nameLabel.Text = emoteData.name; nameLabel.TextScaled = true; nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+            local image = Instance.new("ImageLabel", button)
+            image.Size = UDim2.new(1, -4, 0, 32)
+            image.Position = UDim2.new(0.5, 0, 0, 3)
+            image.AnchorPoint = Vector2.new(0.5, 0)
+            image.BackgroundTransparency = 1
+            image.Image = "rbxthumb://type=Asset&id=" .. tostring(emoteData.id) .. "&w=420&h=420"
+
+            local nameLabel = Instance.new("TextLabel", button)
+            nameLabel.Size = UDim2.new(1, -4, 0, 12)
+            nameLabel.Position = UDim2.new(0, 2, 0, 36)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Font = Enum.Font.Gotham
+            nameLabel.Text = emoteData.name
+            nameLabel.TextScaled = true
+            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+
             button.MouseButton1Click:Connect(function() toggleAnimation(emoteData.animationid) end)
-            return button
+
+            -- Tombol Favorit
+            local starButton = Instance.new("TextButton", container)
+            starButton.Name = "FavoriteButton"
+            starButton.Size = UDim2.new(0, 16, 0, 16) -- Ukuran diperkecil
+            starButton.Position = UDim2.new(1, 0, 0, 0) -- Posisi di pojok kanan atas
+            starButton.AnchorPoint = Vector2.new(1, 0) -- Anchor di pojok kanan atas
+            starButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            starButton.BackgroundTransparency = 0.5
+            starButton.Font = Enum.Font.SourceSansBold
+            starButton.Text = "♥" -- Mengubah ikon menjadi hati
+            starButton.TextSize = 12 -- Ukuran teks diperkecil
+            starButton.ZIndex = 2
+            local starCorner = Instance.new("UICorner", starButton); starCorner.CornerRadius = UDim.new(0, 4)
+
+            local function updateStarVisual()
+                local isFavorite = favoriteEmotes[emoteData.name] == true
+                starButton.TextColor3 = isFavorite and Color3.fromRGB(255, 80, 120) or Color3.fromRGB(150, 150, 150) -- Warna merah muda untuk favorit
+            end
+
+            starButton.MouseButton1Click:Connect(function()
+                favoriteEmotes[emoteData.name] = not favoriteEmotes[emoteData.name]
+                saveFavorites()
+                updateStarVisual()
+                populateEmotes(SearchBox.Text) -- Refresh list if filter is active
+            end)
+
+            updateStarVisual()
+            return container
         end
 
         local function populateEmotes(filter)
             filter = filter and filter:lower() or ""
             EmoteArea.CanvasPosition = Vector2.zero
-            for _, button in pairs(EmoteArea:GetChildren()) do
-                if button:IsA("ImageButton") then button.Visible = (filter == "" or button.Name:lower():find(filter, 1, true)) end
+            for _, container in pairs(EmoteArea:GetChildren()) do
+                if container:IsA("Frame") and container:FindFirstChild("EmoteImageButton") then
+                    local isFavorite = favoriteEmotes[container.Name] == true
+                    local passesSearch = (filter == "" or container.Name:lower():find(filter, 1, true))
+                    local passesFavoriteFilter = (favoriteFilterState == 1) or (favoriteFilterState == 2 and isFavorite) or (favoriteFilterState == 3 and not isFavorite)
+                    
+                    container.Visible = passesSearch and passesFavoriteFilter
+                end
             end
             updateCanvasSize()
         end
@@ -5085,6 +5261,7 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     loadGuiPositions()
     loadFeatureStates()
     loadRecordingsData() -- [[ PERUBAHAN BARU ]]
+    loadFavorites() -- [[ PERUBAHAN BARU ]]
     applyInitialStates()
     switchTab("Player")
     
