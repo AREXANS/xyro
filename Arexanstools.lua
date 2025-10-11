@@ -64,6 +64,7 @@ end
 task.spawn(function()
     RunService.RenderStepped:Connect(function(dt)
         if isPaused or isSmoothPaused then return end
+        if IsPlaybackActive then return end
         local player = game.Players.LocalPlayer
         local char = player.Character
         if not char then return end
@@ -81,12 +82,17 @@ task.spawn(function()
             -- Tangani animasi lompat alami
             local heightDelta = pos2.Y - pos1.Y
             if heightDelta > 2 then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end)
             elseif heightDelta < -2 then
-                humanoid:ChangeState(Enum.HumanoidStateType.Freefall)
+                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Freefall) end)
             else
-                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+                -- Do not force Running here; let Animate select Walk vs Run based on WalkSpeed
+                if isAnimationBypassEnabled then
+                    pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end)
+                end
             end
+
+
 
             -- Interpolasi halus posisi & orientasi
             local alpha = math.clamp(dt / timeDelta, 0, 1)
@@ -202,6 +208,7 @@ task.spawn(function()
     local RunService = game:GetService("RunService")
     RunService.RenderStepped:Connect(function(dt)
         if isPaused or isSmoothPaused then return end
+        if IsPlaybackActive then return end
         local player = game.Players.LocalPlayer
         local char = player.Character
         if not char then return end
@@ -4269,6 +4276,13 @@ task.spawn(function()
             if playbackMovers.attachment and playbackMovers.attachment.Parent then
                 playbackMovers.attachment:Destroy()
             end
+            if playbackMovers.alignPos and playbackMovers.alignPos.Parent then
+                playbackMovers.alignPos:Destroy()
+            end
+            if playbackMovers.alignOrient and playbackMovers.alignOrient.Parent then
+                playbackMovers.alignOrient:Destroy()
+            end
+            -- Clear movers table
             playbackMovers = {}
 
             local char = LocalPlayer.Character
@@ -4291,6 +4305,17 @@ task.spawn(function()
                     if customRunningSound then
                         customRunningSound:Destroy()
                     end
+                end
+
+
+                -- Additional cleanup: ensure HRP velocity/anchored reset and humanoid is usable
+                if hrp then
+                    pcall(function() hrp.Velocity = Vector3.new(0,0,0) end)
+                    pcall(function() hrp.Anchored = false end)
+                end
+                if humanoid then
+                    pcall(function() humanoid.AutoRotate = true end)
+                    pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end)
                 end
             end
         end
@@ -4327,6 +4352,13 @@ task.spawn(function()
             if not (hrp and humanoid) then if onComplete then onComplete() end; return end
             
             originalPlaybackWalkSpeed = humanoid.WalkSpeed
+        -- Mark playback active and ensure Animate script is enabled so it can auto-switch walk/run
+        IsPlaybackActive = true
+        local animateScript = char and char:FindFirstChild("Animate")
+        if animateScript then
+            savedAnimateDisabled = animateScript.Disabled
+            pcall(function() animateScript.Disabled = false end)
+        end
         
             local recordingData = recordingObject.frames or recordingObject
             if not recordingData or #recordingData < 1 then if onComplete then onComplete() end; return end
@@ -5710,6 +5742,22 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local _player = Players.LocalPlayer
+local IsPlaybackActive = false
+local savedAnimateDisabled = nil
+
+local function __restore_playback_state()
+    local char = LocalPlayer and LocalPlayer.Character
+    if char then
+        local animateScript = char:FindFirstChild("Animate")
+        if animateScript and savedAnimateDisabled ~= nil then
+            pcall(function() animateScript.Disabled = savedAnimateDisabled end)
+        end
+        savedAnimateDisabled = nil
+    end
+    IsPlaybackActive = false
+end
+
+
 -- ensure globals used by original script are available; override if needed
 isPaused = isPaused or false
 isSmoothPaused = isSmoothPaused or false
@@ -5794,6 +5842,7 @@ do
 
     playbackConnection = RunService.RenderStepped:Connect(function(dt)
         if isPaused or isSmoothPaused then return end
+        if IsPlaybackActive then return end
         if not _player then return end
         local char = _player.Character
         if not char then return end
@@ -5819,8 +5868,13 @@ do
             elseif heightDelta < -2 then
                 pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Freefall) end)
             else
-                pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end)
+                -- Do not force Running here; let Animate select Walk vs Run based on WalkSpeed
+                if isAnimationBypassEnabled then
+                    pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end)
+                end
             end
+
+
 
             -- smooth interpolation
             local alpha = math.clamp(dt / timeDelta, 0, 1)
@@ -5847,3 +5901,15 @@ do
 end
 
 print("[ArexansTools] Merged playback fix appended - overrides loaded.")
+
+
+-- Ensure cleanup restores Animate state and clears playback flag
+do
+    local _orig_cleanup = cleanupSinglePlayback
+    if type(_orig_cleanup) == "function" then
+        cleanupSinglePlayback = function(isSequence)
+            _orig_cleanup(isSequence)
+            pcall(__restore_playback_state)
+        end
+    end
+end
