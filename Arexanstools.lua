@@ -1908,7 +1908,11 @@ task.spawn(function()
             end
 
             starButton.MouseButton1Click:Connect(function()
-                favoriteEmotes[emoteData.name] = not favoriteEmotes[emoteData.name]
+                if favoriteEmotes[emoteData.name] then
+                    favoriteEmotes[emoteData.name] = nil
+                else
+                    favoriteEmotes[emoteData.name] = true
+                end
                 saveFavorites()
                 updateStarVisual()
                 populateEmotes(SearchBox.Text) -- Refresh list if filter is active
