@@ -1926,60 +1926,72 @@ task.spawn(function()
             return container
         end
 
-        local function populateEmotes(filter)
-            filter = filter and filter:lower() or ""
-            -- EmoteArea.CanvasPosition = Vector2.zero -- [[ PERUBAHAN ]] Dihapus dari sini untuk gulir halus
-            for _, container in pairs(EmoteArea:GetChildren()) do
-                if container:IsA("Frame") and container:FindFirstChild("EmoteImageButton") then
-                    local isFavorite = favoriteEmotes[container.Name] == true
-                    local passesSearch = (filter == "" or container.Name:lower():find(filter, 1, true))
-                    local passesFavoriteFilter = (favoriteFilterState == 1) or (favoriteFilterState == 2 and isFavorite) or (favoriteFilterState == 3 and not isFavorite)
-                    
-                    container.Visible = passesSearch and passesFavoriteFilter
+        -- Fungsi ini sekarang menangani pembangunan ulang dan pemfilteran penuh, menggantikan `populateEmotes`.
+        local function rebuildAndFilterEmotes()
+            -- Muat ulang favorit dari file untuk memastikan data terbaru
+            loadFavorites()
+        
+            -- Hapus semua tombol emote yang ada untuk membangun ulang dari awal
+            for _, child in ipairs(EmoteArea:GetChildren()) do
+                if child:IsA("Frame") and child:FindFirstChild("EmoteImageButton") then
+                    child:Destroy()
                 end
             end
+        
+            -- Buat ulang semua tombol emote dari daftar utama, dengan menerapkan filter
+            local filter = SearchBox.Text and SearchBox.Text:lower() or ""
+            if EmoteList and #EmoteList > 0 then
+                for _, emoteData in ipairs(EmoteList) do
+                    local isFavorite = favoriteEmotes[emoteData.name] == true
+                    local passesSearch = (filter == "" or emoteData.name:lower():find(filter, 1, true))
+                    local passesFavoriteFilter = (favoriteFilterState == 1) or (favoriteFilterState == 2 and isFavorite) or (favoriteFilterState == 3 and not isFavorite)
+
+                    if passesSearch and passesFavoriteFilter then
+                        createEmoteButton(emoteData)
+                    end
+                end
+            end
+            
+            -- Perbarui ukuran kanvas dan gulir dengan lancar ke atas
             updateCanvasSize(function()
-                -- [[ PERUBAHAN BARU ]] Gulir ke atas dengan lancar setelah ukuran diperbarui
                 local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
                 TweenService:Create(EmoteArea, tweenInfo, {CanvasPosition = Vector2.zero}):Play()
+            end)
+        end
+        
+        -- Ganti logika klik tombol filter untuk memanggil fungsi pembangunan ulang
+        for _, btnInfo in ipairs(filterButtons) do
+            btnInfo.button.MouseButton1Click:Connect(function()
+                favoriteFilterState = btnInfo.state
+                updateFilterButtons()
+                rebuildAndFilterEmotes()
             end)
         end
 
         task.spawn(function()
             local success, result = pcall(function() return HttpService:JSONDecode(game:HttpGet("https://raw.githubusercontent.com/AREXANS/emoteff/refs/heads/main/emote.json")) end)
             if success and type(result) == "table" then
-                EmoteList = result; local existingEmotes = {}
-                for _, emote in pairs(EmoteList) do
-                    if emote.name and emote.animationid and emote.id and not existingEmotes[emote.name:lower()] then
-                        createEmoteButton(emote); existingEmotes[emote.name:lower()] = true
-                    end
-                end
+                EmoteList = result -- Isi daftar utama sekali saja
             else
-                warn("Gagal mengambil daftar emote:", result); createEmoteButton({id = 14353423348, animationid = "rbxassetid://14352343065", name = "Bouncy"})
+                warn("Gagal mengambil daftar emote:", result)
+                EmoteList = {{id = 14353423348, animationid = "rbxassetid://14352343065", name = "Bouncy"}}
             end
-            updateCanvasSize()
+            rebuildAndFilterEmotes() -- Lakukan pembangunan awal
             if applyEmoteTransparency then applyEmoteTransparency(isEmoteTransparent) end
         end)
 
-        SearchBox:GetPropertyChangedSignal("Text"):Connect(function() populateEmotes(SearchBox.Text) end)
--- Pull-to-refresh: tarik kebawah dari atas untuk merefresh favorit emote (tanpa notifikasi)
--- Ketika user menarik EmoteArea ke posisi Y < -30, script akan memuat ulang EmoteFavorites.json
--- dan memperbarui tampilan emote secara diam-diam.
-pcall(function()
-    if EmoteArea and typeof(EmoteArea) == "Instance" then
-        EmoteArea:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-            local ok, y = pcall(function() return EmoteArea.CanvasPosition.Y end)
-            if not ok then return end
-            if EmoteArea.CanvasPosition.Y < -30 then
-                -- Muat ulang favorit dari file dan perbarui tampilan
-                pcall(function()
-                    loadFavorites()
-                    populateEmotes(SearchBox and SearchBox.Text or "")
+        SearchBox:GetPropertyChangedSignal("Text"):Connect(rebuildAndFilterEmotes)
+
+        -- Pull-to-refresh juga menggunakan fungsi pembangunan ulang yang baru
+        pcall(function()
+            if EmoteArea and typeof(EmoteArea) == "Instance" then
+                EmoteArea:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+                    if EmoteArea.CanvasPosition.Y < -30 then
+                        rebuildAndFilterEmotes()
+                    end
                 end)
             end
         end)
-    end
-end)
 
         
         if applyEmoteTransparency then
