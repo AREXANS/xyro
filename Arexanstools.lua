@@ -1994,6 +1994,7 @@ end)
 
         local header = mainFrame:FindFirstChild("Header")
         local searchBox = mainFrame:FindFirstChild("SearchBox")
+        local filterFrame = mainFrame:FindFirstChild("FilterFrame") -- [[FIX]] Get the filter frame
         
         local transValue = 0.9 -- [MODIFIED] Increased transparency
         local opaqueValue = 0
@@ -2002,6 +2003,15 @@ end)
         EmoteToggleButton.BackgroundTransparency = isTransparent and transValue or 0
         if header then header.BackgroundTransparency = isTransparent and transValue or opaqueValue end
         if searchBox then searchBox.BackgroundTransparency = isTransparent and transValue or opaqueValue end
+
+        -- [[FIX]] Apply transparency to filter buttons
+        if filterFrame then
+            for _, button in ipairs(filterFrame:GetChildren()) do
+                if button:IsA("TextButton") then
+                    button.BackgroundTransparency = isTransparent and transValue or opaqueValue
+                end
+            end
+        end
 
         local emoteArea = mainFrame:FindFirstChild("EmoteArea")
         if emoteArea then
