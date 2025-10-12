@@ -1995,7 +1995,7 @@ end)
         local header = mainFrame:FindFirstChild("Header")
         local searchBox = mainFrame:FindFirstChild("SearchBox")
         
-        local transValue = 0.85
+        local transValue = 0.9 -- [MODIFIED] Increased transparency
         local opaqueValue = 0
         
         mainFrame.BackgroundTransparency = isTransparent and transValue or opaqueValue
@@ -2005,9 +2005,13 @@ end)
 
         local emoteArea = mainFrame:FindFirstChild("EmoteArea")
         if emoteArea then
-            for _, button in ipairs(emoteArea:GetChildren()) do
-                if button:IsA("ImageButton") then
-                    button.BackgroundTransparency = isTransparent and transValue or opaqueValue
+            for _, container in ipairs(emoteArea:GetChildren()) do
+                -- The direct children are container Frames, not the buttons themselves.
+                if container:IsA("Frame") then
+                    local button = container:FindFirstChild("EmoteImageButton")
+                    if button and button:IsA("ImageButton") then
+                        button.BackgroundTransparency = isTransparent and transValue or opaqueValue
+                    end
                 end
             end
         end
