@@ -1823,6 +1823,7 @@ task.spawn(function()
         EmoteArea.BorderSizePixel = 0
         EmoteArea.ScrollBarImageColor3 = Color3.fromRGB(90, 150, 255)
         EmoteArea.ScrollBarThickness = 5
+        EmoteArea.ScrollingDirection = Enum.ScrollingDirection.Y -- [[ PERUBAHAN ]] Hanya izinkan gulir vertikal
         EmoteArea.Parent = EmoteMainFrame
         local UIPadding = Instance.new("UIPadding", EmoteArea); UIPadding.PaddingLeft = UDim.new(0, 10); UIPadding.PaddingRight = UDim.new(0, 10); UIPadding.PaddingTop = UDim.new(0, 5); UIPadding.PaddingBottom = UDim.new(0, 10)
 
@@ -1833,10 +1834,13 @@ task.spawn(function()
         UIGridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         UIGridLayout.Parent = EmoteArea
 
-        local function updateCanvasSize()
+        local function updateCanvasSize(callback)
             task.wait()
             local contentHeight = UIGridLayout.AbsoluteContentSize.Y
             EmoteArea.CanvasSize = UDim2.new(0, 0, 0, contentHeight)
+            if callback then
+                callback()
+            end
         end
 
         local function toggleAnimation(animId)
@@ -1924,7 +1928,7 @@ task.spawn(function()
 
         local function populateEmotes(filter)
             filter = filter and filter:lower() or ""
-            EmoteArea.CanvasPosition = Vector2.zero
+            -- EmoteArea.CanvasPosition = Vector2.zero -- [[ PERUBAHAN ]] Dihapus dari sini untuk gulir halus
             for _, container in pairs(EmoteArea:GetChildren()) do
                 if container:IsA("Frame") and container:FindFirstChild("EmoteImageButton") then
                     local isFavorite = favoriteEmotes[container.Name] == true
@@ -1934,7 +1938,11 @@ task.spawn(function()
                     container.Visible = passesSearch and passesFavoriteFilter
                 end
             end
-            updateCanvasSize()
+            updateCanvasSize(function()
+                -- [[ PERUBAHAN BARU ]] Gulir ke atas dengan lancar setelah ukuran diperbarui
+                local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+                TweenService:Create(EmoteArea, tweenInfo, {CanvasPosition = Vector2.zero}):Play()
+            end)
         end
 
         task.spawn(function()
