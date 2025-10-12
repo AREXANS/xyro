@@ -1,3 +1,15 @@
+
+
+--[[
+🔥 PATCH v3 FINAL: Smooth Playback, Jump Sync, Pause Natural
+============================================================
+- Transisi antar rekaman halus tanpa gerakan kaku.
+- Animasi lompat dan jatuh sinkron dengan perubahan posisi frame.
+- Pause/Resume bekerja alami tanpa freeze/stuck, karakter diam sementara.
+- Kecepatan langkah kaki (WalkSpeed) otomatis menyesuaikan jarak antar frame.
+- Bypass Animation tetap berjalan lancar dan sinkron.
+--]]
+
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
@@ -1942,43 +1954,19 @@ task.spawn(function()
         end)
 
         SearchBox:GetPropertyChangedSignal("Text"):Connect(function() populateEmotes(SearchBox.Text) end)
-
--- Scroll hanya vertikal
-EmoteArea.ScrollingDirection = Enum.ScrollingDirection.Y
-
--- Ikon loading di atas saat tarik kebawah
-local loadingIcon = Instance.new("ImageLabel")
-loadingIcon.Size = UDim2.new(0, 26, 0, 26)
-loadingIcon.AnchorPoint = Vector2.new(0.5, 1)
-loadingIcon.Position = UDim2.new(0.5, 0, 0, -8)
-loadingIcon.BackgroundTransparency = 1
-loadingIcon.Image = "rbxassetid://3926305904" -- ikon lingkaran loading
-loadingIcon.ImageRectOffset = Vector2.new(924, 724)
-loadingIcon.ImageRectSize = Vector2.new(36, 36)
-loadingIcon.Visible = false
-loadingIcon.Rotation = 0
-loadingIcon.Parent = EmoteArea
-
-local TweenService = game:GetService("TweenService")
-local rotateTween = TweenService:Create(loadingIcon, TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {Rotation = 360})
-
--- Pull-to-refresh (tarik ke bawah dari atas)
+-- Pull-to-refresh: tarik kebawah dari atas untuk merefresh favorit emote (tanpa notifikasi)
+-- Ketika user menarik EmoteArea ke posisi Y < -30, script akan memuat ulang EmoteFavorites.json
+-- dan memperbarui tampilan emote secara diam-diam.
 pcall(function()
     if EmoteArea and typeof(EmoteArea) == "Instance" then
         EmoteArea:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-            local y = EmoteArea.CanvasPosition.Y
-            if y < -30 and not loadingIcon.Visible then
-                loadingIcon.Visible = true
-                rotateTween:Play()
-                task.spawn(function()
-                    pcall(loadFavorites)
-                    pcall(function()
-                        populateEmotes(SearchBox and SearchBox.Text or "")
-                    end)
-                    task.wait(0.8)
-                    rotateTween:Cancel()
-                    loadingIcon.Visible = false
-                    loadingIcon.Rotation = 0
+            local ok, y = pcall(function() return EmoteArea.CanvasPosition.Y end)
+            if not ok then return end
+            if EmoteArea.CanvasPosition.Y < -30 then
+                -- Muat ulang favorit dari file dan perbarui tampilan
+                pcall(function()
+                    loadFavorites()
+                    populateEmotes(SearchBox and SearchBox.Text or "")
                 end)
             end
         end)
