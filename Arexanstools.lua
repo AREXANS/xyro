@@ -911,7 +911,7 @@ task.spawn(function()
     EmoteToggleButton.Text = "🤡"
     EmoteToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     EmoteToggleButton.TextSize = 24
-    EmoteToggleButton.Visible = true 
+    EmoteToggleButton.Visible = false
     EmoteToggleButton.Parent = MiniToggleContainer
     local EmoteToggleCorner = Instance.new("UICorner", EmoteToggleButton)
     EmoteToggleCorner.CornerRadius = UDim.new(0, 8)
@@ -1367,6 +1367,10 @@ task.spawn(function()
             ESPName = IsEspNameEnabled,
             ESPBody = IsEspBodyEnabled,
             -- [[ PERUBAHAN SELESAI ]]
+            EmoteVIP = isEmoteEnabled,
+            AnimationVIP = isAnimationEnabled,
+            EmoteTransparent = isEmoteTransparent,
+            AnimationTransparent = isAnimationTransparent,
             WalkSpeedValue = Settings.WalkSpeed,
             FlySpeedValue = Settings.FlySpeed,
             FEInvisibleTransparencyValue = Settings.FEInvisibleTransparency
@@ -1398,6 +1402,10 @@ task.spawn(function()
                 -- [[ PERUBAHAN DIMULAI: Muat status ESP terpisah ]]
                 IsEspNameEnabled = decodedData.ESPName or false
                 IsEspBodyEnabled = decodedData.ESPBody or false
+                isEmoteEnabled = decodedData.EmoteVIP or false
+                isAnimationEnabled = decodedData.AnimationVIP or false
+                isEmoteTransparent = decodedData.EmoteTransparent or false
+                isAnimationTransparent = decodedData.AnimationTransparent or false
                 -- [[ PERUBAHAN SELESAI ]]
                 
                 Settings.WalkSpeed = decodedData.WalkSpeedValue or 16
@@ -1616,7 +1624,62 @@ task.spawn(function()
     -- ====================================================================
     -- == BAGIAN FUNGSI ANIMASI (INTEGRASI DARI animation.lua)         ==
     -- ====================================================================
+    local applyEmoteTransparency
     local applyAnimationTransparency
+
+    applyEmoteTransparency = function(isTransparent)
+        local emoteGui = CoreGui:FindFirstChild("EmoteGuiStandalone")
+        if not emoteGui then return end
+        local frame = emoteGui:FindFirstChild("MainFrame", true)
+        if not frame then return end
+    
+        local transValue = 0.8 -- The transparency value when "on"
+        local defaultTransparency = 0 -- The default, opaque value
+    
+        -- Helper function to apply transparency to a UI element
+        local function setTransparency(element, transparentValue, opaqueValue)
+            if element then
+                element.BackgroundTransparency = isTransparent and transparentValue or opaqueValue
+            end
+        end
+    
+        -- Apply to all key elements
+        setTransparency(frame, transValue, defaultTransparency)
+        setTransparency(frame:FindFirstChild("Header"), transValue, defaultTransparency)
+        setTransparency(frame:FindFirstChild("SearchBox"), transValue, defaultTransparency)
+        setTransparency(frame:FindFirstChild("EmoteResizeHandle"), 0.85, 0.5)
+    
+        -- Apply to filter buttons
+        local filterFrame = frame:FindFirstChild("FilterFrame")
+        if filterFrame then
+            for _, button in ipairs(filterFrame:GetDescendants()) do
+                if button:IsA("TextButton") then
+                    setTransparency(button, transValue, defaultTransparency)
+                end
+            end
+        end
+    
+        -- Apply to emote buttons in the scrolling area
+        local emoteArea = frame:FindFirstChild("EmoteArea")
+        if emoteArea then
+            for _, container in ipairs(emoteArea:GetChildren()) do
+                if container:IsA("Frame") then
+                    local button = container:FindFirstChild("EmoteImageButton")
+                    setTransparency(button, transValue, defaultTransparency)
+                end
+            end
+        end
+    end
+
+    local function destroyEmoteGUI()
+        if CoreGui:FindFirstChild("EmoteGuiStandalone") then
+            CoreGui:FindFirstChild("EmoteGuiStandalone"):Destroy()
+        end
+        if EmoteScreenGui and EmoteScreenGui.Parent then
+            EmoteScreenGui:Destroy()
+            EmoteScreenGui = nil
+        end
+    end
 
     local function destroyAnimationGUI()
         if AnimationScreenGui and AnimationScreenGui.Parent then
@@ -3818,15 +3881,13 @@ task.spawn(function()
     end
 
     local function setupVipTab()
-        createToggle(VipTabContent, "Emote VIP", isEmoteEnabled, function(v) 
-            isEmoteEnabled = v; 
-            if isEmoteEnabled then 
-                initializeEmoteGUI() 
-                EmoteToggleButton.Visible = true
-            else 
-                destroyEmoteGUI() 
-                EmoteToggleButton.Visible = false
-            end 
+        createToggle(VipTabContent, "Emote VIP", isEmoteEnabled, function(v)
+            isEmoteEnabled = v
+            EmoteToggleButton.Visible = v
+            if not v then
+                destroyEmoteGUI()
+            end
+            saveFeatureStates()
         end).LayoutOrder = 1
         createToggle(VipTabContent, "Animasi VIP", isAnimationEnabled, function(v) 
             isAnimationEnabled = v; 
@@ -3837,14 +3898,19 @@ task.spawn(function()
                 destroyAnimationGUI() 
                 AnimationShowButton.Visible = false
             end 
+            saveFeatureStates()
         end).LayoutOrder = 2
         createToggle(VipTabContent, "Emote Transparan", isEmoteTransparent, function(v)
             isEmoteTransparent = v
-            if isEmoteEnabled and applyEmoteTransparency then applyEmoteTransparency(v) end
+            if applyEmoteTransparency then
+                applyEmoteTransparency(v)
+            end
+            saveFeatureStates()
         end).LayoutOrder = 3
         createToggle(VipTabContent, "Animasi transparan", isAnimationTransparent, function(v)
             isAnimationTransparent = v
             if isAnimationEnabled and applyAnimationTransparency then applyAnimationTransparency(v) end
+            saveFeatureStates()
         end).LayoutOrder = 4
     end
 
