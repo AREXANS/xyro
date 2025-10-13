@@ -5918,19 +5918,26 @@ end
 
 -- Main Emote GUI Function
 local function initializeEmoteGUI()
-if applyEmoteTransparency then
-    applyEmoteTransparency(true)
-end
+    -- Check if the GUI already exists to prevent duplicates.
+    local existingGui = CoreGui:FindFirstChild("EmoteGuiStandalone")
+    if existingGui and existingGui.Parent then
+        -- If it exists, just toggle its visibility and stop the function.
+        existingGui.Enabled = not existingGui.Enabled
+        return
+    end
+
+    if applyEmoteTransparency then
+        applyEmoteTransparency(true)
+    end
     local EmoteScreenGui = nil
     
+    -- This local function is only used for the 'X' button within this GUI instance.
     local function destroyEmoteGUI()
         if EmoteScreenGui and EmoteScreenGui.Parent then
             EmoteScreenGui:Destroy()
         end
         EmoteScreenGui = nil
     end
-
-    destroyEmoteGUI()
 
     local EmoteList = {}
     local currentTrack = nil
@@ -6290,6 +6297,7 @@ end
 
 
 
+-- ===================================================================
 -- ===================================================================
 -- Emote GUI wiring: connect existing EmoteToggleButton (🤡) to initializeEmoteGUI()
 -- If the Arexanstools GUI exists and contains EmoteToggleButton, clicking it will open the emote GUI.
