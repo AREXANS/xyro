@@ -6091,3 +6091,224 @@ end
 
 -- ======= APPENDED: emote.lua START =======
 -- End of merged file
+
+
+----------------------------------------------------
+-- ⚡ PATCH: Toggleable Safe Touch Fling v3.0
+-- Fitur fling hanya aktif saat ON dan tidak melempar karakter lokal.
+----------------------------------------------------
+do
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local IsTouchFlingEnabled = false
+    local activeConns = {}
+
+    local function cleanup()
+        for _, conn in ipairs(activeConns) do
+            if conn and typeof(conn.Disconnect) == "function" then
+                pcall(function() conn:Disconnect() end)
+            end
+        end
+        activeConns = {}
+    end
+
+    local function flingTarget(targetRoot)
+        if not (targetRoot and targetRoot.Parent) then return end
+        local BV = Instance.new("BodyVelocity")
+        BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        BV.P = 1e6
+        BV.Velocity = Vector3.new(
+            math.random(-7e5, 7e5),
+            math.random(9e5, 1.2e6),
+            math.random(-7e5, 7e5)
+        )
+        BV.Parent = targetRoot
+        task.delay(0.12, function()
+            if BV and BV.Parent then BV:Destroy() end
+        end)
+    end
+
+    local function enableTouchFling(character)
+        if not character then return end
+        cleanup()
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                local conn = part.Touched:Connect(function(hit)
+                    if not IsTouchFlingEnabled then return end
+                    local hitParent = hit.Parent
+                    if not hitParent or hitParent == character then return end
+                    local targetHumanoid = hitParent:FindFirstChildOfClass("Humanoid")
+                    local targetRoot = hitParent:FindFirstChild("HumanoidRootPart")
+                    if targetHumanoid and targetRoot then
+                        flingTarget(targetRoot)
+                    end
+                end)
+                table.insert(activeConns, conn)
+            end
+        end
+    end
+
+    local function toggleTouchFling(state)
+        IsTouchFlingEnabled = state
+        if state then
+            local char = LocalPlayer.Character
+            if char then enableTouchFling(char) end
+        else
+            cleanup()
+        end
+    end
+
+    Players.LocalPlayer.CharacterAdded:Connect(function(char)
+        task.wait(1)
+        if IsTouchFlingEnabled then enableTouchFling(char) end
+    end)
+
+    -- Integrasi ke GUI utama (opsional, tombol toggle)
+    if _G.CreateArexansButton then
+        _G.CreateArexansButton("Touch Fling", function(isOn)
+            toggleTouchFling(isOn)
+        end)
+    end
+
+    -- Untuk kompatibilitas manual (jika GUI belum ada)
+    _G.ToggleTouchFling = toggleTouchFling
+end
+----------------------------------------------------
+
+
+
+
+-- ✅ PATCH v4: Touch Fling Full Body Detection Fix (Robust)
+-- Perbaikan tambahan:
+-- 1) Menggunakan posisi part yang menyentuh (hit.Position) vs part lokal untuk arah yang lebih akurat (khusus telapak kaki R15).
+-- 2) Meng-attach listener ke descendant yang baru ditambahkan saat respawn.
+-- 3) Membersihkan koneksi dengan aman saat dimatikan atau karakter respawn.
+-- 4) Memeriksa dan mengabaikan non-collidable parts (CanCollide=false) untuk mengurangi false positives.
+do
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    local RunService = game:GetService("RunService")
+
+    local flingConnections = {}
+    local characterConnections = {}
+    local isTouchFlingEnabled = false
+
+    local function disconnectAll(list)
+        for _, conn in ipairs(list) do
+            pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+        end
+        table.clear(list)
+    end
+
+    local function onPartTouched(part, hit)
+        -- Validasi
+        if not (part and hit) then return end
+        -- Abaikan jika hit adalah bagian dari diri sendiri
+        local hitModel = hit:FindFirstAncestorOfClass("Model")
+        if hitModel and hitModel == LocalPlayer.Character then return end
+
+        -- Cari humanoid target
+        local targetModel = hit:FindFirstAncestorOfClass("Model")
+        if not targetModel then return end
+        local targetHum = targetModel:FindFirstChildOfClass("Humanoid")
+        if not targetHum or targetHum.Health <= 0 then return end
+
+        -- Abaikan parts yang tidak bisa bertabrakan
+        if not hit.CanCollide and not hit:IsA("Terrain") then return end
+
+        -- Dapatkan HumanoidRootPart target (fallback ke posisi hit jika tidak ditemukan)
+        local tRoot = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChild("Torso") or targetModel:FindFirstChild("UpperTorso") or nil
+        -- Dapatkan root kita
+        local myChar = LocalPlayer.Character
+        if not myChar then return end
+        local myRoot = myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Torso") or myChar:FindFirstChild("UpperTorso")
+        if not myRoot then return end
+
+        -- Hit position (lebih akurat untuk telapak kaki)
+        local hitPos = hit.Position
+        local sourcePos = part.Position
+
+        -- Hitung arah berdasarkan posisi part yang menyentuh ke posisi hit (detail untuk kaki)
+        local ok, dir = pcall(function() return ( (hitPos - sourcePos).Unit ) end)
+        if not ok or not dir or dir.Magnitude == 0 then
+            -- fallback ke root-to-root
+            if tRoot and myRoot then
+                dir = (tRoot.Position - myRoot.Position).Unit
+            else
+                return
+            end
+        end
+
+        -- Tetap pakai gaya fling lama: set AssemblyLinearVelocity pada HumanoidRootPart target
+        if tRoot and tRoot:IsA("BasePart") then
+            pcall(function()
+                -- gunakan kekuatan yang sama seperti implementasi sebelumnya
+                local flingForce = dir * 200 + Vector3.new(0, 120, 0)
+                tRoot.AssemblyLinearVelocity = flingForce
+            end)
+        end
+    end
+
+    local function attachToPart(part)
+        if not (part and part:IsA("BasePart")) then return end
+        -- Pastikan tidak duplicate: gunakan attribute untuk menandai sudah terpasang
+        if part:GetAttribute("TouchFlingAttached") then return end
+        part:SetAttribute("TouchFlingAttached", true)
+        local conn = part.Touched:Connect(function(hit) 
+            -- Only process when feature is enabled
+            if isTouchFlingEnabled then
+                onPartTouched(part, hit) 
+            end
+        end)
+        table.insert(flingConnections, conn)
+    end
+
+    local function attachToCharacterParts(character)
+        if not character then return end
+        -- Attach to current BaseParts
+        for _, child in ipairs(character:GetDescendants()) do
+            if child:IsA("BasePart") then
+                attachToPart(child)
+            end
+        end
+        -- Listen for parts added later (accessories, respawned parts)
+        local cconn = character.DescendantAdded:Connect(function(desc)
+            if desc:IsA("BasePart") then
+                -- Delay kecil agar properti seperti CanCollide sudah terset
+                task.delay(0.02, function() attachToPart(desc) end)
+            end
+        end)
+        table.insert(characterConnections, cconn)
+    end
+
+    local function onCharacterAdded(char)
+        -- Bersihkan koneksi sebelumnya
+        disconnectAll(flingConnections)
+        disconnectAll(characterConnections)
+        -- reset attributes agar bisa dipasang ulang
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then pcall(function() part:SetAttribute("TouchFlingAttached", false) end) end
+        end
+        attachToCharacterParts(char)
+    end
+
+    function EnableTouchFlingFullBody()
+        isTouchFlingEnabled = true
+        -- disconnect sebelumnya untuk mencegah duplikat
+        disconnectAll(flingConnections)
+        disconnectAll(characterConnections)
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        attachToCharacterParts(char)
+        -- juga reconnect saat respawn
+        local conn = LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+        table.insert(characterConnections, conn)
+    end
+
+    function DisableTouchFlingFullBody()
+        isTouchFlingEnabled = false
+        disconnectAll(flingConnections)
+        disconnectAll(characterConnections)
+    end
+end
+-- ✅ END PATCH v4
+
