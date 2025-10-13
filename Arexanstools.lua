@@ -1404,7 +1404,7 @@ task.spawn(function()
                 IsEspBodyEnabled = decodedData.ESPBody or false
                 isEmoteEnabled = decodedData.EmoteVIP or false
                 isAnimationEnabled = decodedData.AnimationVIP or false
-                isEmoteTransparent = decodedData.EmoteTransparent or false
+                isEmoteTransparent = decodedData.EmoteTransparent ~= false
                 isAnimationTransparent = decodedData.AnimationTransparent or false
                 -- [[ PERUBAHAN SELESAI ]]
                 
@@ -5918,6 +5918,9 @@ end
 
 -- Main Emote GUI Function
 local function initializeEmoteGUI()
+if applyEmoteTransparency then
+    applyEmoteTransparency(true)
+end
     local EmoteScreenGui = nil
     
     local function destroyEmoteGUI()
@@ -6267,6 +6270,12 @@ local function initializeEmoteGUI()
     SearchBox:GetPropertyChangedSignal("Text"):Connect(function() populateEmotes(SearchBox.Text) end)
 
     EmoteArea:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+
+-- Terapkan transparansi sesuai toggle VIP saat GUI emote dibuat
+if applyEmoteTransparency and type(isEmoteTransparent) == "boolean" then
+    applyEmoteTransparency(isEmoteTransparent)
+end
+
         if EmoteArea.CanvasPosition.Y < -30 then
             pcall(function()
                 loadFavorites()
