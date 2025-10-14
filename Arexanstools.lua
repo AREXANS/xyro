@@ -790,6 +790,7 @@ task.spawn(function()
     local originalCameraProperties = {}
     local spectateCameraConnections = {}
     local areTeleportIconsVisible = true
+    local isAutoLooping = false
     
     local isEmoteToggleDraggable = true
     local isAnimationToggleDraggable = true
@@ -4134,60 +4135,6 @@ task.spawn(function()
         createToggle(GeneralTabContent, "Anti-Fling", antifling_enabled, ToggleAntiFling)
     end
 
-
-    local function setupTeleportTab()
-        createButton(TeleportTabContent, "Pindai Ulang Map", function() for _, part in pairs(Workspace:GetDescendants()) do if part:IsA("BasePart") then local nameLower = part.Name:lower(); if (nameLower:find("checkpoint") or nameLower:find("pos") or nameLower:find("finish") or nameLower:find("start")) and not Players:GetPlayerFromCharacter(part.Parent) then addTeleportLocation(part.Name, part.CFrame) end end end end).LayoutOrder = 1
-        createButton(TeleportTabContent, "Simpan Lokasi Saat Ini", function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then local newName = "Kustom " .. (#savedTeleportLocations + 1); addTeleportLocation(newName, LocalPlayer.Character.HumanoidRootPart.CFrame) end end).LayoutOrder = 2
-        
-        local importExportFrame = Instance.new("Frame", TeleportTabContent)
-        importExportFrame.Size = UDim2.new(1, 0, 0, 25)
-        importExportFrame.BackgroundTransparency = 1
-        importExportFrame.LayoutOrder = 3
-        local ieLayout = Instance.new("UIListLayout", importExportFrame)
-        ieLayout.FillDirection = Enum.FillDirection.Horizontal
-        ieLayout.Padding = UDim.new(0, 5)
-        
-        local exportButton = createButton(importExportFrame, "Ekspor", function() 
-            if not setclipboard then showNotification("Executor tidak mendukung clipboard!", Color3.fromRGB(200, 50, 50)); return end
-            local dataToExport = {}; for _, loc in ipairs(savedTeleportLocations) do table.insert(dataToExport, { Name = loc.Name, CFrameData = {loc.CFrame:GetComponents()} }) end
-            local success, result = pcall(function() local jsonData = HttpService:JSONEncode(dataToExport); setclipboard(jsonData); showNotification("Data disalin ke clipboard!", Color3.fromRGB(50, 200, 50)) end)
-            if not success then showNotification("Gagal mengekspor data!", Color3.fromRGB(200, 50, 50)) end 
-        end)
-        exportButton.Size = UDim2.new(0.5, -2.5, 1, 0)
-        
-        local importButton = createButton(importExportFrame, "Impor", function() 
-            showImportPrompt(function(text) 
-                if not text or text == "" then return end
-                local success, decodedData = pcall(HttpService.JSONDecode, HttpService, text)
-                if not success or type(decodedData) ~= "table" then showNotification("Data impor tidak valid!", Color3.fromRGB(200, 50, 50)); return end
-                local existingNames = {}; for _, loc in ipairs(savedTeleportLocations) do existingNames[loc.Name] = true end
-                local importedCount = 0
-                for _, data in ipairs(decodedData) do 
-                    if type(data) == "table" and data.Name and data.CFrameData and not existingNames[data.Name] then 
-                        local cframe = CFrame.new(unpack(data.CFrameData))
-                        table.insert(savedTeleportLocations, { Name = data.Name, CFrame = cframe })
-                        existingNames[data.Name] = true
-                        importedCount = importedCount + 1 
-                    end 
-                end
-                if importedCount > 0 then 
-                    table.sort(savedTeleportLocations, naturalCompare)
-                    saveTeleportData()
-                    updateTeleportList()
-                    showNotification(importedCount .. " lokasi berhasil diimpor!", Color3.fromRGB(50, 200, 50)) 
-                else 
-                    showNotification("Tidak ada lokasi baru untuk diimpor.", Color3.fromRGB(200, 150, 50)) 
-                end 
-            end) 
-        end)
-        importButton.Size = UDim2.new(0.5, -2.5, 1, 0)
-        
-        createToggle(TeleportTabContent, "Tampilkan Ikon", areTeleportIconsVisible, function(v)
-            areTeleportIconsVisible = v
-            updateTeleportIconVisibility()
-        end).LayoutOrder = 4
-    end
-
     local function setupVipTab()
         createToggle(VipTabContent, "Emote VIP", isEmoteEnabled, function(v)
             isEmoteEnabled = v
@@ -4240,7 +4187,372 @@ task.spawn(function()
         logoutButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 
-    local function setupRekamanTab()
+
+    do
+        local function setupPlayerTab()
+        local playerHeaderFrame = Instance.new("Frame", PlayerTabContent); playerHeaderFrame.Size = UDim2.new(1, 0, 0, 55); playerHeaderFrame.BackgroundTransparency = 1
+        local playerCountLabel = Instance.new("TextLabel", playerHeaderFrame); playerCountLabel.Name = "PlayerCountLabel"; playerCountLabel.Size = UDim2.new(1, -20, 0, 15); playerCountLabel.BackgroundTransparency = 1; playerCountLabel.Text = "Pemain Online: " .. #Players:GetPlayers(); playerCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255); playerCountLabel.TextSize = 12; playerCountLabel.TextXAlignment = Enum.TextXAlignment.Left; playerCountLabel.Font = Enum.Font.SourceSansBold
+        
+        local refreshButton = Instance.new("TextButton", playerHeaderFrame)
+        refreshButton.Name = "RefreshButton"
+        refreshButton.Size = UDim2.new(0, 15, 0, 15); refreshButton.Position = UDim2.new(1, -15, 0, 0); refreshButton.BackgroundTransparency = 1
+        refreshButton.Text = "🔄"; refreshButton.TextColor3 = Color3.fromRGB(0, 200, 255); refreshButton.TextSize = 14; refreshButton.Font = Enum.Font.SourceSansBold
+        
+        local isAnimatingRefresh = false
+        refreshButton.MouseButton1Click:Connect(function() 
+            if isAnimatingRefresh then return end; isAnimatingRefresh = true
+            local tweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Linear); local tween = TweenService:Create(refreshButton, tweenInfo, { Rotation = refreshButton.Rotation + 360 }); tween:Play()
+            if updatePlayerList then updatePlayerList() end 
+            tween.Completed:Connect(function() isAnimatingRefresh = false end)
+        end)
+    
+        local searchFrame = Instance.new("Frame", playerHeaderFrame); searchFrame.Size = UDim2.new(1, 0, 0, 25); searchFrame.Position = UDim2.new(0, 0, 0, 20); searchFrame.BackgroundTransparency = 1
+        local searchTextBox = Instance.new("TextBox", searchFrame); searchTextBox.Text = ""; searchTextBox.Size = UDim2.new(0.7, -10, 1, 0); searchTextBox.Position = UDim2.new(0, 5, 0, 0); searchTextBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35); searchTextBox.TextColor3 = Color3.fromRGB(200, 200, 200); searchTextBox.PlaceholderText = "Cari Pemain..."; searchTextBox.TextSize = 12; searchTextBox.Font = Enum.Font.SourceSans; searchTextBox.ClearTextOnFocus = true; local sboxCorner = Instance.new("UICorner", searchTextBox); sboxCorner.CornerRadius = UDim.new(0, 5)
+        local searchButton = Instance.new("TextButton", searchFrame); searchButton.Size = UDim2.new(0.3, 0, 1, 0); searchButton.Position = UDim2.new(0.7, 0, 0, 0); searchButton.BackgroundColor3 = Color3.fromRGB(0, 150,  255); searchButton.BorderSizePixel = 0; searchButton.Text = "Cari"; searchButton.TextColor3 = Color3.fromRGB(255, 255, 255); searchButton.TextSize = 12; searchButton.Font = Enum.Font.SourceSansBold; local sbtnCorner = Instance.new("UICorner", searchButton); sbtnCorner.CornerRadius = UDim.new(0, 5)
+        
+        local function createPlayerButton(player)
+            local playerFrame = Instance.new("Frame", PlayerListContainer); playerFrame.Size = UDim2.new(1, 0, 0, 35); playerFrame.BackgroundTransparency = 1; playerFrame.Name = player.Name
+            
+            local avatarImage = Instance.new("ImageButton", playerFrame)
+            avatarImage.Name = "AvatarImageButton"
+            avatarImage.Size = UDim2.new(0, 25, 0, 25)
+            avatarImage.Position = UDim2.new(0, 5, 0.5, -12.5)
+            avatarImage.BackgroundTransparency = 1
+            avatarImage.AutoButtonColor = false
+            pcall(function() avatarImage.Image = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) end)
+            
+            local avatarCorner = Instance.new("UICorner", avatarImage)
+            avatarCorner.CornerRadius = UDim.new(1, 0)
+            local avatarStroke = Instance.new("UIStroke", avatarImage)
+            avatarStroke.Name = "SpectateStroke"
+            avatarStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            avatarStroke.Color = Color3.fromRGB(40, 200, 40)
+            avatarStroke.Thickness = 1.5
+            avatarStroke.Transparency = 1 
+            
+            avatarImage.MouseButton1Click:Connect(function()
+                startSpectate(player)
+            end)
+            
+            local displaynameLabel = Instance.new("TextLabel", playerFrame); displaynameLabel.Size = UDim2.new(1, -100, 0, 15); displaynameLabel.Position = UDim2.new(0, 35, 0, 2); displaynameLabel.BackgroundTransparency = 1; displaynameLabel.TextXAlignment = Enum.TextXAlignment.Left; displaynameLabel.Text = player.DisplayName; displaynameLabel.TextColor3 = Color3.fromRGB(255, 255, 255); displaynameLabel.TextSize = 10; displaynameLabel.Font = Enum.Font.SourceSansSemibold
+            local usernameLabel = Instance.new("TextLabel", playerFrame); usernameLabel.Size = UDim2.new(1, -100, 0, 12); usernameLabel.Position = UDim2.new(0, 35, 0, 18); usernameLabel.BackgroundTransparency = 1; usernameLabel.TextXAlignment = Enum.TextXAlignment.Left; usernameLabel.Text = "@" .. player.Name; usernameLabel.TextColor3 = Color3.fromRGB(150, 150, 150); usernameLabel.TextSize = 8; usernameLabel.Font = Enum.Font.SourceSans
+            local distanceLabel = Instance.new("TextLabel", playerFrame); distanceLabel.Name = "DistanceLabel"; distanceLabel.Size = UDim2.new(1, -100, 0, 12); distanceLabel.Position = UDim2.new(0, 35, 0, 30); distanceLabel.BackgroundTransparency = 1; distanceLabel.TextXAlignment = Enum.TextXAlignment.Left; distanceLabel.TextColor3 = Color3.fromRGB(0, 255, 127); distanceLabel.TextSize = 9; distanceLabel.Font = Enum.Font.SourceSansSemibold
+            
+            local actionsFrame = Instance.new("Frame", playerFrame)
+            actionsFrame.Name = "ActionsFrame"
+            actionsFrame.Size = UDim2.new(0, 60, 0, 16)
+            actionsFrame.Position = UDim2.new(1, -65, 0.5, -8)
+            actionsFrame.BackgroundTransparency = 1
+
+            local actionsLayout = Instance.new("UIListLayout", actionsFrame)
+            actionsLayout.FillDirection = Enum.FillDirection.Horizontal
+            actionsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+            actionsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            actionsLayout.Padding = UDim.new(0, 2)
+            
+            local flingButton = Instance.new("TextButton", actionsFrame)
+            flingButton.Name = "FlingButton"
+            flingButton.Size = UDim2.new(0, 16, 0, 16)
+            flingButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+            flingButton.BorderSizePixel = 0
+            flingButton.Font = Enum.Font.SourceSansBold
+            flingButton.Text = "☠️"
+            flingButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            flingButton.TextSize = 10
+            local flingCorner = Instance.new("UICorner", flingButton); flingCorner.CornerRadius = UDim.new(0, 4)
+            flingButton.MouseButton1Click:Connect(function()
+                ToggleFlingOnPlayer(player)
+            end)
+    
+            local newTeleportButton = Instance.new("TextButton", actionsFrame)
+            newTeleportButton.Name = "TeleportButton"
+            newTeleportButton.Size = UDim2.new(0, 16, 0, 16)
+            newTeleportButton.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+            newTeleportButton.BorderSizePixel = 0
+            newTeleportButton.Font = Enum.Font.SourceSansBold
+            newTeleportButton.Text = "🌀"
+            newTeleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            newTeleportButton.TextSize = 10
+            local tpCorner = Instance.new("UICorner", newTeleportButton); tpCorner.CornerRadius = UDim.new(0, 4)
+            
+            newTeleportButton.MouseButton1Click:Connect(function()
+                local localChar = LocalPlayer.Character
+                local targetChar = player.Character
+    
+                if not (targetChar and targetChar:FindFirstChild("HumanoidRootPart") and localChar and localChar:FindFirstChild("HumanoidRootPart")) then
+                    showNotification("Target atau karakter Anda tidak ditemukan.", Color3.fromRGB(200, 50, 50))
+                    return
+                end
+    
+                local targetPosition = targetChar.HumanoidRootPart.Position
+                local teleportCFrame = CFrame.new(targetPosition + Vector3.new(0, 3, 0))
+    
+                if IsViewingPlayer then
+                    originalPlayerCFrame = teleportCFrame
+                    if localPlayerIsHidden and localChar.Parent == nil then
+                        localChar:SetPrimaryPartCFrame(teleportCFrame)
+                    end
+                    showNotification("Posisi kembali Anda diatur ke " .. player.DisplayName, Color3.fromRGB(50, 150, 255))
+                else
+                    localChar.HumanoidRootPart.CFrame = teleportCFrame
+                end
+            end)
+
+            local copyMovementButton = Instance.new("TextButton", actionsFrame)
+            copyMovementButton.Name = "CopyMovementButton"
+            copyMovementButton.Size = UDim2.new(0, 16, 0, 16)
+            copyMovementButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80) -- Default color
+            copyMovementButton.BorderSizePixel = 0
+            copyMovementButton.Font = Enum.Font.SourceSansBold
+            copyMovementButton.Text = "👯"
+            copyMovementButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            copyMovementButton.TextSize = 12
+            local copyCorner = Instance.new("UICorner", copyMovementButton); copyCorner.CornerRadius = UDim.new(0, 5)
+            copyMovementButton.MouseButton1Click:Connect(function()
+                toggleCopyMovement(player)
+            end)
+            
+            return playerFrame
+        end
+    
+        searchTextBox.FocusLost:Connect(function() CurrentPlayerFilter = searchTextBox.Text; updatePlayerList() end)
+        searchButton.MouseButton1Click:Connect(function() CurrentPlayerFilter = searchTextBox.Text; updatePlayerList() end)
+    
+        local function setupPlayer(player)
+            if player == LocalPlayer then return end
+            
+            local button = createPlayerButton(player)
+            PlayerButtons[player.UserId] = button
+            updatePlayerList()
+        end
+    
+        ConnectEvent(RunService.RenderStepped, function()
+            if MainFrame.Visible and PlayerTabContent.Visible then
+                for player, button in pairs(PlayerButtons) do
+                    updateSinglePlayerButton(Players:GetPlayerByUserId(player))
+                end
+            end
+        end)
+        
+        ConnectEvent(Players.PlayerRemoving, function(player)
+            if PlayerButtons[player.UserId] then
+                PlayerButtons[player.UserId]:Destroy()
+                PlayerButtons[player.UserId] = nil
+            end
+            if espCache[player.UserId] then
+                if espCache[player.UserId].billboard then espCache[player.UserId].billboard:Destroy() end
+                if espCache[player.UserId].highlight and espCache[player.UserId].highlight.Parent then
+                     espCache[player.UserId].highlight:Destroy()
+                end
+                espCache[player.UserId] = nil
+            end
+            if IsViewingPlayer and currentlyViewedPlayer == player then
+                cycleSpectate(1) 
+            end
+            if currentFlingTarget == player then
+                ToggleFlingOnPlayer(player) 
+            end
+            task.wait(0.1)
+            updatePlayerList()
+        end)
+    
+        ConnectEvent(Players.PlayerAdded, setupPlayer)
+    
+        for _, player in ipairs(Players:GetPlayers()) do
+            setupPlayer(player)
+        end
+
+        ConnectEvent(RunService.RenderStepped, function()
+            if SpectatorGui and SpectatorGui.Enabled then
+                updateSpectatorGUI()
+            end
+        end)
+    end
+        setupPlayerTab()
+    end
+    do
+        local function setupGeneralTab()
+            createToggle(GeneralTabContent, "ESP Nama", IsEspNameEnabled, ToggleESPName)
+            createToggle(GeneralTabContent, "ESP Tubuh", IsEspBodyEnabled, ToggleESPBody)
+            createSlider(GeneralTabContent, "Kecepatan Jalan", 0, Settings.MaxWalkSpeed, Settings.WalkSpeed, "", 1, function(v) Settings.WalkSpeed = v; if IsWalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character.Humanoid then LocalPlayer.Character.Humanoid.WalkSpeed = v end end)
+            createToggle(GeneralTabContent, "Jalan Cepat", IsWalkSpeedEnabled, function(v) IsWalkSpeedEnabled = v; ToggleWalkSpeed(v) end)
+            createSlider(GeneralTabContent, "Kecepatan Terbang", 0, Settings.MaxFlySpeed, Settings.FlySpeed, "", 0.1, function(v) Settings.FlySpeed = v end)
+            createToggle(GeneralTabContent, "Terbang", IsFlying, function(v) if v then if UserInputService.TouchEnabled then StartMobileFly() else StartFly() end else if UserInputService.TouchEnabled then StopMobileFly() else StopFly() end end end)
+            createToggle(GeneralTabContent, "Noclip", IsNoclipEnabled, function(v) ToggleNoclip(v) end)
+            createToggle(GeneralTabContent, "Infinity Jump", IsInfinityJumpEnabled, function(v) IsInfinityJumpEnabled = v; saveFeatureStates(); if v then if LocalPlayer.Character and LocalPlayer.Character.Humanoid then infinityJumpConnection = ConnectEvent(UserInputService.JumpRequest, function() LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) end elseif infinityJumpConnection then infinityJumpConnection:Disconnect(); infinityJumpConnection = nil end end)
+            createToggle(GeneralTabContent, "Mode Kebal", IsGodModeEnabled, ToggleGodMode)
+            createToggle(GeneralTabContent, "FE Invisible", IsFEInvisibleEnabled, ToggleFEInvisible)
+            createSlider(GeneralTabContent, "Transparansi Invisible", 0, 100, Settings.FEInvisibleTransparency * 100, "%", 1, function(v)
+                Settings.FEInvisibleTransparency = v / 100
+                if IsFEInvisibleEnabled and LocalPlayer.Character then
+                    setCharacterTransparency(LocalPlayer.Character, Settings.FEInvisibleTransparency)
+                end
+                saveFeatureStates() -- Simpan perubahan transparansi
+            end)
+            createButton(GeneralTabContent, "Buka Touch Fling", CreateTouchFlingGUI)
+            createToggle(GeneralTabContent, "Anti-Fling", antifling_enabled, ToggleAntiFling)
+        end
+        setupGeneralTab()
+    end
+    do
+        local function setupTeleportTab()
+            createButton(TeleportTabContent, "Pindai Ulang Map", function() for _, part in pairs(Workspace:GetDescendants()) do if part:IsA("BasePart") then local nameLower = part.Name:lower(); if (nameLower:find("checkpoint") or nameLower:find("pos") or nameLower:find("finish") or nameLower:find("start")) and not Players:GetPlayerFromCharacter(part.Parent) then addTeleportLocation(part.Name, part.CFrame) end end end end).LayoutOrder = 1
+            createButton(TeleportTabContent, "Simpan Lokasi Saat Ini", function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then local newName = "Kustom " .. (#savedTeleportLocations + 1); addTeleportLocation(newName, LocalPlayer.Character.HumanoidRootPart.CFrame) end end).LayoutOrder = 2
+            
+            local importExportFrame = Instance.new("Frame", TeleportTabContent)
+            importExportFrame.Size = UDim2.new(1, 0, 0, 25)
+            importExportFrame.BackgroundTransparency = 1
+            importExportFrame.LayoutOrder = 3
+            local ieLayout = Instance.new("UIListLayout", importExportFrame)
+            ieLayout.FillDirection = Enum.FillDirection.Horizontal
+            ieLayout.Padding = UDim.new(0, 5)
+            
+            local exportButton = createButton(importExportFrame, "Ekspor", function() 
+                if not setclipboard then showNotification("Executor tidak mendukung clipboard!", Color3.fromRGB(200, 50, 50)); return end
+                local dataToExport = {}; for _, loc in ipairs(savedTeleportLocations) do table.insert(dataToExport, { Name = loc.Name, CFrameData = {loc.CFrame:GetComponents()} }) end
+                local success, result = pcall(function() local jsonData = HttpService:JSONEncode(dataToExport); setclipboard(jsonData); showNotification("Data disalin ke clipboard!", Color3.fromRGB(50, 200, 50)) end)
+                if not success then showNotification("Gagal mengekspor data!", Color3.fromRGB(200, 50, 50)) end 
+            end)
+            exportButton.Size = UDim2.new(0.5, -2.5, 1, 0)
+            
+            local importButton = createButton(importExportFrame, "Impor", function() 
+                showImportPrompt(function(text) 
+                    if not text or text == "" then return end
+                    local success, decodedData = pcall(HttpService.JSONDecode, HttpService, text)
+                    if not success or type(decodedData) ~= "table" then showNotification("Data impor tidak valid!", Color3.fromRGB(200, 50, 50)); return end
+                    local existingNames = {}; for _, loc in ipairs(savedTeleportLocations) do existingNames[loc.Name] = true end
+                    local importedCount = 0
+                    for _, data in ipairs(decodedData) do 
+                        if type(data) == "table" and data.Name and data.CFrameData and not existingNames[data.Name] then 
+                            local cframe = CFrame.new(unpack(data.CFrameData))
+                            table.insert(savedTeleportLocations, { Name = data.Name, CFrame = cframe })
+                            existingNames[data.Name] = true
+                            importedCount = importedCount + 1 
+                        end 
+                    end
+                    if importedCount > 0 then 
+                        table.sort(savedTeleportLocations, naturalCompare)
+                        saveTeleportData()
+                        updateTeleportList()
+                        showNotification(importedCount .. " lokasi berhasil diimpor!", Color3.fromRGB(50, 200, 50)) 
+                    else 
+                        showNotification("Tidak ada lokasi baru untuk diimpor.", Color3.fromRGB(200, 150, 50)) 
+                    end 
+                end) 
+            end)
+            importButton.Size = UDim2.new(0.5, -2.5, 1, 0)
+            
+            createToggle(TeleportTabContent, "Tampilkan Ikon", areTeleportIconsVisible, function(v)
+                areTeleportIconsVisible = v
+                updateTeleportIconVisibility()
+            end).LayoutOrder = 4
+
+            -- FITUR BARU: AUTO LOOPING TELEPORT DENGAN UI KOMPAK
+            local autoLoopSettingsFrame = Instance.new("Frame", TeleportTabContent)
+            autoLoopSettingsFrame.Name, autoLoopSettingsFrame.Size, autoLoopSettingsFrame.BackgroundTransparency, autoLoopSettingsFrame.Visible, autoLoopSettingsFrame.LayoutOrder = "AutoLoopSettingsFrame", UDim2.new(1, 0, 0, 30), 1, false, 6
+            local settingsLayout = Instance.new("UIListLayout", autoLoopSettingsFrame); settingsLayout.FillDirection, settingsLayout.VerticalAlignment, settingsLayout.Padding = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center, UDim.new(0, 5)
+
+            local function createCompactInput(parent, label, default)
+                local frame = Instance.new("Frame", parent); frame.Size, frame.BackgroundTransparency = UDim2.new(0.4, -12, 1, 0), 1
+                local layout = Instance.new("UIListLayout", frame); layout.FillDirection, layout.VerticalAlignment = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center
+                local textLabel = Instance.new("TextLabel", frame); textLabel.Size = UDim2.new(0, 15, 1, 0); textLabel.Text, textLabel.TextColor3, textLabel.TextSize, textLabel.Font, textLabel.BackgroundTransparency = label, Color3.fromRGB(200,200,200), 11, Enum.Font.SourceSans, 1
+                local textBox = Instance.new("TextBox", frame); textBox.Size = UDim2.new(1, -15, 0, 20); textBox.Text, textBox.BackgroundColor3 = default, Color3.fromRGB(50, 50, 50); textBox.TextColor3, textBox.TextSize, textBox.Font = Color3.fromRGB(255,255,255), 12, Enum.Font.SourceSans; Instance.new("UICorner", textBox).CornerRadius = UDim.new(0, 4)
+                return textBox
+            end
+
+            local repeatInput = createCompactInput(autoLoopSettingsFrame, "U:", "5")
+            local delayInput = createCompactInput(autoLoopSettingsFrame, "D:", "2")
+            local playStopButton = createButton(autoLoopSettingsFrame, "▶️", function() end)
+            playStopButton.Size, playStopButton.BackgroundColor3 = UDim2.new(0.2, 0, 0, 22), Color3.fromRGB(50, 180, 50)
+
+            createToggle(TeleportTabContent, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 5
+
+            playStopButton.MouseButton1Click:Connect(function()
+                if isAutoLooping then -- Tombol Stop ditekan
+                    isAutoLooping = false
+                    playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
+                else -- Tombol Play ditekan
+                    local repetitions, delayTime = tonumber(repeatInput.Text), tonumber(delayInput.Text)
+                    if not repetitions or repetitions <= 0 or not delayTime or delayTime < 0 then showNotification("Input jumlah & delay tidak valid.", Color3.fromRGB(200, 50, 50)); return end
+                    if #savedTeleportLocations == 0 then showNotification("Tidak ada lokasi teleport.", Color3.fromRGB(200, 50, 50)); return end
+                    
+                    isAutoLooping = true
+                    playStopButton.Text, playStopButton.BackgroundColor3 = "⏹️", Color3.fromRGB(200, 50, 50)
+                    
+                    task.spawn(function()
+                        for i = 1, repetitions do
+                            if not isAutoLooping then break end
+                            for _, locData in ipairs(savedTeleportLocations) do
+                                if not isAutoLooping then break end
+                                if LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart then LocalPlayer.Character.HumanoidRootPart.CFrame = locData.CFrame * CFrame.new(0, 3, 0) else isAutoLooping = false; break end
+                                task.wait(delayTime)
+                            end
+                        end
+                        isAutoLooping = false; playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
+                    end)
+                end
+            end)
+        end
+        setupTeleportTab()
+    end
+    do
+        local function setupVipTab()
+            createToggle(VipTabContent, "Emote VIP", isEmoteEnabled, function(v)
+                isEmoteEnabled = v
+                EmoteToggleButton.Visible = v
+                if not v then
+                    destroyEmoteGUI()
+                end
+                saveFeatureStates()
+            end).LayoutOrder = 1
+            createToggle(VipTabContent, "Animasi VIP", isAnimationEnabled, function(v) 
+                isAnimationEnabled = v; 
+                if isAnimationEnabled then 
+                    initializeAnimationGUI() 
+                    AnimationShowButton.Visible = true
+                else 
+                    destroyAnimationGUI() 
+                    AnimationShowButton.Visible = false
+                end 
+                saveFeatureStates()
+            end).LayoutOrder = 2
+            createToggle(VipTabContent, "Emote Transparan", isEmoteTransparent, function(v)
+                isEmoteTransparent = v
+                applyEmoteTransparency(v)
+                saveFeatureStates()
+            end).LayoutOrder = 3
+            createToggle(VipTabContent, "Animasi transparan", isAnimationTransparent, function(v)
+                isAnimationTransparent = v
+                if isAnimationEnabled and applyAnimationTransparency then applyAnimationTransparency(v) end
+                saveFeatureStates()
+            end).LayoutOrder = 4
+        end
+        setupVipTab()
+    end
+    do
+        local function setupSettingsTab()
+            createToggle(SettingsTabContent, "Kunci Bar Tombol", not isMiniToggleDraggable, function(v) isMiniToggleDraggable = not v end).LayoutOrder = 1
+            createSlider(SettingsTabContent, "Ukuran Tombol Navigasi", 10, 50, 30, "px", 1, function(v)
+                if MiniToggleButton then
+                    MiniToggleButton.Size = UDim2.new(0, v, 0, v)
+                    MiniToggleButton.TextSize = math.floor(v * 0.6)
+                end
+            end).LayoutOrder = 2
+            createButton(SettingsTabContent, "Simpan Posisi UI", saveGuiPositions).LayoutOrder = 3
+            createButton(SettingsTabContent, "Hop Server", function() HopServer() end).LayoutOrder = 4
+            createToggle(SettingsTabContent, "Anti-Lag", IsAntiLagEnabled, ToggleAntiLag).LayoutOrder = 5
+            createToggle(SettingsTabContent, "Boost FPS", IsBoostFPSEnabled, ToggleBoostFPS).LayoutOrder = 6
+            createToggle(SettingsTabContent, "Shift Lock", IsShiftLockEnabled, ToggleShiftLock).LayoutOrder = 9
+            createButton(SettingsTabContent, "Tutup", CloseScript).LayoutOrder = 11
+        
+            local logoutButton = createButton(SettingsTabContent, "Logout", HandleLogout)
+            logoutButton.LayoutOrder = 11
+            logoutButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end
+        setupSettingsTab()
+    end
+    do
+        local function setupRekamanTab()
         -- [[ PERBAIKAN: Tata letak dirombak untuk memperbaiki masalah scrolling ]]
         -- 1. Buat kontainer untuk semua kontrol statis (tombol, input, dll.)
         local controlsContainer = Instance.new("Frame")
@@ -5069,13 +5381,8 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             end
         end)
     end
-
-    setupPlayerTab()
-    setupGeneralTab()
-    setupTeleportTab()
-    setupVipTab()
-    setupSettingsTab()
-    setupRekamanTab()
+        setupRekamanTab()
+    end
 
     -- Fungsi untuk membuka/menutup jendela utama, dipisahkan agar bisa dipanggil oleh MakeDraggable
     local function toggleMainFrame()
@@ -5897,7 +6204,6 @@ task.spawn(function()
     settingsTab.AncestryChanged:Connect(function(_, parent)
         if not parent then cleanup() end
     end)
-    game:BindToClose(function() cleanup() end)
 
 end)
 
