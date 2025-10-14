@@ -1000,13 +1000,16 @@ task.spawn(function()
     ExpirationLabel.Font = Enum.Font.SourceSans
     ExpirationLabel.Parent = MainFrame
     
-    local TabsFrame = Instance.new("Frame")
+    local TabsFrame = Instance.new("ScrollingFrame")
     TabsFrame.Name = "TabsFrame"
     TabsFrame.Size = UDim2.new(0, 60, 1, -45) -- Lebar diperkecil
     TabsFrame.Position = UDim2.new(0, 0, 0, 45) -- Y position adjusted for the 15px ExpirationLabel
     TabsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     TabsFrame.BorderSizePixel = 0
     TabsFrame.Parent = MainFrame
+    TabsFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+    TabsFrame.ScrollBarThickness = 0
+    TabsFrame.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
     
     local TabListLayout = Instance.new("UIListLayout")
     TabListLayout.Name = "TabListLayout"
@@ -1015,6 +1018,14 @@ task.spawn(function()
     TabListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
     TabListLayout.FillDirection = Enum.FillDirection.Vertical
     TabListLayout.Parent = TabsFrame
+
+    local TabPadding = Instance.new("UIPadding", TabsFrame)
+    TabPadding.PaddingTop = UDim.new(0, 5)
+    TabPadding.PaddingBottom = UDim.new(0, 5)
+
+    TabListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        TabsFrame.CanvasSize = UDim2.new(0, 0, 0, TabListLayout.AbsoluteContentSize.Y)
+    end)
     
     local ContentFrame = Instance.new("Frame")
     ContentFrame.Name = "ContentFrame"
@@ -1040,7 +1051,9 @@ task.spawn(function()
     PlayerListContainer.Position = UDim2.new(0, 0, 0, 55)
     PlayerListContainer.BackgroundTransparency = 1
     PlayerListContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-    PlayerListContainer.ScrollBarThickness = 10
+    PlayerListContainer.ScrollBarThickness = 4
+    PlayerListContainer.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+    PlayerListContainer.ElasticBehavior = Enum.ElasticBehavior.Never
     PlayerListContainer.VerticalScrollBarInset = Enum.ScrollBarInset.Always
     PlayerListContainer.ScrollingDirection = Enum.ScrollingDirection.Y
     PlayerListContainer.Parent = PlayerTabContent
@@ -1052,7 +1065,9 @@ task.spawn(function()
     GeneralTabContent.BackgroundTransparency = 1
     GeneralTabContent.Visible = false
     GeneralTabContent.CanvasSize = UDim2.new(0, 0, 0, 0) 
-    GeneralTabContent.ScrollBarThickness = 10
+    GeneralTabContent.ScrollBarThickness = 4
+    GeneralTabContent.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+    GeneralTabContent.ElasticBehavior = Enum.ElasticBehavior.Never
     GeneralTabContent.VerticalScrollBarInset = Enum.ScrollBarInset.Always
     GeneralTabContent.ScrollingDirection = Enum.ScrollingDirection.Y
     GeneralTabContent.Parent = ContentFrame
@@ -1064,7 +1079,9 @@ task.spawn(function()
     TeleportTabContent.BackgroundTransparency = 1
     TeleportTabContent.Visible = false
     TeleportTabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    TeleportTabContent.ScrollBarThickness = 10
+    TeleportTabContent.ScrollBarThickness = 4
+    TeleportTabContent.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+    TeleportTabContent.ElasticBehavior = Enum.ElasticBehavior.Never
     TeleportTabContent.VerticalScrollBarInset = Enum.ScrollBarInset.Always
     TeleportTabContent.ScrollingDirection = Enum.ScrollingDirection.Y
     TeleportTabContent.Parent = ContentFrame
@@ -1076,7 +1093,9 @@ task.spawn(function()
     VipTabContent.BackgroundTransparency = 1
     VipTabContent.Visible = false
     VipTabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    VipTabContent.ScrollBarThickness = 10
+    VipTabContent.ScrollBarThickness = 4
+    VipTabContent.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+    VipTabContent.ElasticBehavior = Enum.ElasticBehavior.Never
     VipTabContent.VerticalScrollBarInset = Enum.ScrollBarInset.Always
     VipTabContent.ScrollingDirection = Enum.ScrollingDirection.Y
     VipTabContent.Parent = ContentFrame
@@ -1088,7 +1107,9 @@ task.spawn(function()
     SettingsTabContent.BackgroundTransparency = 1
     SettingsTabContent.Visible = false
     SettingsTabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
-    SettingsTabContent.ScrollBarThickness = 10
+    SettingsTabContent.ScrollBarThickness = 4
+    SettingsTabContent.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+    SettingsTabContent.ElasticBehavior = Enum.ElasticBehavior.Never
     SettingsTabContent.VerticalScrollBarInset = Enum.ScrollBarInset.Always
     SettingsTabContent.ScrollingDirection = Enum.ScrollingDirection.Y
     SettingsTabContent.Parent = ContentFrame
