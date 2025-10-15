@@ -1,319 +1,454 @@
--- magnet.lua
---[[
-    Skrip ini membuat GUI magnet yang dapat digeser dengan kontrol untuk 
-    memulai/menghentikan efek magnet, dan menyesuaikan kekuatan serta jangkauannya.
-    Gaya visualnya meniru 'Arexanstools.lua' untuk konsistensi.
-    
-    VERSI INSTAN & FINAL (DIPERBAIKI ULANG):
-    - Gaya tarik magnet ditingkatkan secara drastis agar objek langsung tertarik dengan sangat cepat saat tombol play ditekan.
-    - Mesin fisika dirombak total menggunakan AssemblyLinearVelocity untuk performa instan tanpa delay.
-    - Efek magnet sekarang bekerja secara instan tanpa delay `Lerp` setelah menekan tombol play.
-    - Tata letak GUI diperbaiki agar semua elemen terlihat dan tidak terpotong.
-    - Menambahkan fitur Scan untuk mencari parts dalam jangkauan tertentu.
-    - Fungsi Play/Stop sekarang hanya akan mempengaruhi parts yang sudah di-scan.
-    - Menambahkan notifikasi scan di bagian bawah layar.
-    - Status magnet kini tersimpan, sehingga akan otomatis aktif kembali setelah respawn.
-]]
+-- Warpah Exploit - Magnet Push/Pull Parts (OPTIMIZED - NO LAG)
+-- Design Like Right Panel - Clean & Professional
 
--- Layanan Roblox
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local player = Players.LocalPlayer
 
--- Variabel Lokal
-local LocalPlayer = Players.LocalPlayer
-local isMagnetActive = false
-local wasMagnetActive = false -- Menyimpan status magnet sebelum mati/respawn
+-- Variables
+local magnetEnabled = false
 local magnetPower = 50
-local magnetRange = 50
-local magnetDirection = "Ke Karakter" -- Opsi: "Ke Karakter", "Acak"
-local magnetConnection = nil
-local scannedParts = {} -- Menyimpan parts hasil scan
-local isRemoveEnabled = false
-local touchConnections = {}
-local notificationFrame = nil -- Untuk notifikasi global di bawah layar
-local notificationLabel = nil
-local notificationTween = nil
+local magnetRange = 100
+local magnetMode = "PULL"
+local minimized = false
 
--- ====================================================================
--- == FUNGSI UTILITAS GUI                                            ==
--- ====================================================================
+-- Performance Settings
+local UPDATE_INTERVAL = 0.03 -- Update lebih cepat untuk respons lebih baik
+local lastUpdate = 0
+local cachedParts = {}
+local CACHE_REFRESH_TIME = 2 -- Refresh cache setiap 2 detik
+local lastCacheRefresh = 0
 
-local function MakeDraggable(guiObject, dragHandle)
-    local dragInput = nil
-    local dragStart = nil
-    local startPos = nil
+-- Character
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
 
-    dragHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput, dragStart, startPos = input, input.Position, guiObject.Position
-        end
-    end)
+-- Create GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "WarpahExploitGUI"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 999
+gui.Parent = game:GetService("CoreGui")
 
-    dragHandle.InputChanged:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragInput then
-            local delta = input.Position - dragStart
-            guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
+-- Main Frame
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 350, 0, 280)
+main.Position = UDim2.new(0.5, -175, 0.5, -140)
+main.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
 
-    dragHandle.InputEnded:Connect(function(input)
-        if input == dragInput then dragInput = nil end
-    end)
-end
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 8)
 
-local function createCompactTextBox(parent, name, defaultValue)
-    local frame = Instance.new("Frame", parent); frame.BackgroundTransparency = 1; frame.Size = UDim2.new(0, 55, 1, 0)
-    local label = Instance.new("TextLabel", frame); label.Size = UDim2.new(1, 0, 0, 12); label.BackgroundTransparency = 1; label.Font = Enum.Font.SourceSans
-    label.Text = name; label.TextColor3 = Color3.fromRGB(200, 200, 200); label.TextSize = 10; label.TextXAlignment = Enum.TextXAlignment.Center
-    local textBox = Instance.new("TextBox", frame); textBox.Size = UDim2.new(1, 0, 1, -14); textBox.Position = UDim2.new(0, 0, 0, 14)
-    textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35); textBox.TextColor3 = Color3.fromRGB(220, 220, 220); textBox.Text = tostring(defaultValue)
-    textBox.Font = Enum.Font.SourceSans; textBox.TextSize = 12; textBox.TextXAlignment = Enum.TextXAlignment.Center
-    local corner = Instance.new("UICorner", textBox); corner.CornerRadius = UDim.new(0, 4)
-    return textBox
-end
+-- Neon Border
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(0, 255, 100)
+stroke.Thickness = 2
 
-local function createToggle(parent, name, initialState, callback)
-    local frame = Instance.new("Frame", parent); frame.Size = UDim2.new(1, 0, 0, 25); frame.BackgroundTransparency = 1
-    local label = Instance.new("TextLabel", frame); label.Size = UDim2.new(1, -45, 1, 0); label.BackgroundTransparency = 1; label.Font = Enum.Font.SourceSans
-    label.Text = name; label.TextColor3 = Color3.fromRGB(220, 220, 220); label.TextSize = 12; label.TextXAlignment = Enum.TextXAlignment.Left
-    local switch = Instance.new("TextButton", frame); switch.Size = UDim2.new(0, 40, 0, 20); switch.Position = UDim2.new(1, -40, 0.5, -10)
-    switch.BackgroundColor3 = initialState and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(60, 60, 60); switch.Text = ""
-    local switchCorner = Instance.new("UICorner", switch); switchCorner.CornerRadius = UDim.new(1, 0)
-    local thumb = Instance.new("Frame", switch); thumb.Size = UDim2.new(0, 16, 0, 16)
-    thumb.Position = initialState and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8); thumb.BackgroundColor3 = Color3.fromRGB(220, 220, 220)
-    local thumbCorner = Instance.new("UICorner", thumb); thumbCorner.CornerRadius = UDim.new(1, 0)
-    local isToggled = initialState
-    switch.MouseButton1Click:Connect(function()
-        isToggled = not isToggled
-        local goalPosition = isToggled and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-        local goalColor = isToggled and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(60, 60, 60)
-        TweenService:Create(thumb, TweenInfo.new(0.2), {Position = goalPosition}):Play()
-        TweenService:Create(switch, TweenInfo.new(0.2), {BackgroundColor3 = goalColor}):Play()
-        callback(isToggled)
-    end)
-    return frame
-end
+-- Header
+local header = Instance.new("Frame", main)
+header.Size = UDim2.new(1, 0, 0, 48)
+header.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+header.BorderSizePixel = 0
 
-local function showNotification(message, color, duration)
-    if notificationTween then notificationTween:Cancel() end
-    notificationFrame.Visible = true; notificationLabel.Text = message; notificationLabel.TextColor3 = color
-    TweenService:Create(notificationFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0.2}):Play()
-    TweenService:Create(notificationLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
-    if duration then
-        task.delay(duration, function()
-            notificationTween = TweenService:Create(notificationFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1})
-            notificationTween:Play()
-            TweenService:Create(notificationLabel, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-            notificationTween.Completed:Connect(function() notificationFrame.Visible = false end)
-        end)
-    end
-end
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 8)
 
--- ====================================================================
--- == LOGIKA INTI MAGNET                                             ==
--- ====================================================================
-local powerTextBox, rangeTextBox, toggleButton
+local headerFix = Instance.new("Frame", header)
+headerFix.Size = UDim2.new(1, 0, 0.5, 0)
+headerFix.Position = UDim2.new(0, 0, 0.5, 0)
+headerFix.BackgroundColor3 = Color3.fromRGB(8, 8, 10)
+headerFix.BorderSizePixel = 0
 
-local function stopMagnet()
-    if not isMagnetActive then return end
-    isMagnetActive = false
-    if magnetConnection then magnetConnection:Disconnect(); magnetConnection = nil end
+-- Title
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -100, 1, 0)
+title.Position = UDim2.new(0, 15, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "WARPAH EXPLOIT"
+title.TextColor3 = Color3.fromRGB(0, 255, 100)
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Minimize Button
+local minBtn = Instance.new("TextButton", header)
+minBtn.Size = UDim2.new(0, 35, 0, 33)
+minBtn.Position = UDim2.new(1, -80, 0.5, -16.5)
+minBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+minBtn.Text = "-"
+minBtn.TextColor3 = Color3.fromRGB(0, 255, 100)
+minBtn.TextSize = 22
+minBtn.Font = Enum.Font.GothamBold
+minBtn.BorderSizePixel = 0
+
+Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 6)
+
+-- Close Button
+local closeBtn = Instance.new("TextButton", header)
+closeBtn.Size = UDim2.new(0, 35, 0, 33)
+closeBtn.Position = UDim2.new(1, -40, 0.5, -16.5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextSize = 18
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.BorderSizePixel = 0
+
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+
+-- Content Container
+local content = Instance.new("Frame", main)
+content.Size = UDim2.new(1, -30, 1, -60)
+content.Position = UDim2.new(0, 15, 0, 55)
+content.BackgroundTransparency = 1
+
+-- Toggle Button (Large Green)
+local toggleBtn = Instance.new("TextButton", content)
+toggleBtn.Size = UDim2.new(1, 0, 0, 48)
+toggleBtn.Position = UDim2.new(0, 0, 0, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+toggleBtn.Text = "START MAGNET"
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.TextSize = 15
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.BorderSizePixel = 0
+
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
+-- Mode Container
+local modeFrame = Instance.new("Frame", content)
+modeFrame.Size = UDim2.new(1, 0, 0, 42)
+modeFrame.Position = UDim2.new(0, 0, 0, 56)
+modeFrame.BackgroundTransparency = 1
+
+-- Pull Button
+local pullBtn = Instance.new("TextButton", modeFrame)
+pullBtn.Size = UDim2.new(0.485, 0, 1, 0)
+pullBtn.Position = UDim2.new(0, 0, 0, 0)
+pullBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+pullBtn.Text = "PULL"
+pullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+pullBtn.TextSize = 14
+pullBtn.Font = Enum.Font.GothamBold
+pullBtn.BorderSizePixel = 0
+
+Instance.new("UICorner", pullBtn).CornerRadius = UDim.new(0, 6)
+
+-- Push Button
+local pushBtn = Instance.new("TextButton", modeFrame)
+pushBtn.Size = UDim2.new(0.485, 0, 1, 0)
+pushBtn.Position = UDim2.new(0.515, 0, 0, 0)
+pushBtn.BackgroundColor3 = Color3.fromRGB(35, 38, 42)
+pushBtn.Text = "PUSH"
+pushBtn.TextColor3 = Color3.fromRGB(120, 125, 130)
+pushBtn.TextSize = 14
+pushBtn.Font = Enum.Font.GothamBold
+pushBtn.BorderSizePixel = 0
+
+Instance.new("UICorner", pushBtn).CornerRadius = UDim.new(0, 6)
+
+-- Power Container
+local powerContainer = Instance.new("Frame", content)
+powerContainer.Size = UDim2.new(1, 0, 0, 44)
+powerContainer.Position = UDim2.new(0, 0, 0, 106)
+powerContainer.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+powerContainer.BorderSizePixel = 0
+
+Instance.new("UICorner", powerContainer).CornerRadius = UDim.new(0, 6)
+
+local powerLbl = Instance.new("TextLabel", powerContainer)
+powerLbl.Size = UDim2.new(0.3, 0, 1, 0)
+powerLbl.Position = UDim2.new(0, 12, 0, 0)
+powerLbl.BackgroundTransparency = 1
+powerLbl.Text = "Power:"
+powerLbl.TextColor3 = Color3.fromRGB(0, 255, 100)
+powerLbl.TextSize = 13
+powerLbl.Font = Enum.Font.GothamBold
+powerLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local powerInput = Instance.new("TextBox", powerContainer)
+powerInput.Size = UDim2.new(0.35, 0, 0, 28)
+powerInput.Position = UDim2.new(0.6, 0, 0.5, -14)
+powerInput.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+powerInput.Text = "999"
+powerInput.TextColor3 = Color3.fromRGB(10, 12, 15)
+powerInput.TextSize = 14
+powerInput.Font = Enum.Font.GothamBold
+powerInput.TextXAlignment = Enum.TextXAlignment.Center
+powerInput.BorderSizePixel = 0
+
+Instance.new("UICorner", powerInput).CornerRadius = UDim.new(0, 6)
+
+-- Range Container
+local rangeContainer = Instance.new("Frame", content)
+rangeContainer.Size = UDim2.new(1, 0, 0, 44)
+rangeContainer.Position = UDim2.new(0, 0, 0, 158)
+rangeContainer.BackgroundColor3 = Color3.fromRGB(18, 20, 24)
+rangeContainer.BorderSizePixel = 0
+
+Instance.new("UICorner", rangeContainer).CornerRadius = UDim.new(0, 6)
+
+local rangeLbl = Instance.new("TextLabel", rangeContainer)
+rangeLbl.Size = UDim2.new(0.3, 0, 1, 0)
+rangeLbl.Position = UDim2.new(0, 12, 0, 0)
+rangeLbl.BackgroundTransparency = 1
+rangeLbl.Text = "Range:"
+rangeLbl.TextColor3 = Color3.fromRGB(0, 255, 100)
+rangeLbl.TextSize = 13
+rangeLbl.Font = Enum.Font.GothamBold
+rangeLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+local rangeInput = Instance.new("TextBox", rangeContainer)
+rangeInput.Size = UDim2.new(0.35, 0, 0, 28)
+rangeInput.Position = UDim2.new(0.6, 0, 0.5, -14)
+rangeInput.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+rangeInput.Text = "100"
+rangeInput.TextColor3 = Color3.fromRGB(10, 12, 15)
+rangeInput.TextSize = 14
+rangeInput.Font = Enum.Font.GothamBold
+rangeInput.TextXAlignment = Enum.TextXAlignment.Center
+rangeInput.BorderSizePixel = 0
+
+Instance.new("UICorner", rangeInput).CornerRadius = UDim.new(0, 6)
+
+-- Parts Affected Label (Bottom)
+local infoLbl = Instance.new("TextLabel", content)
+infoLbl.Size = UDim2.new(1, 0, 0, 30)
+infoLbl.Position = UDim2.new(0, 0, 1, -30)
+infoLbl.BackgroundTransparency = 1
+infoLbl.Text = "Parts Affected: 0"
+infoLbl.TextColor3 = Color3.fromRGB(0, 255, 100)
+infoLbl.TextSize = 14
+infoLbl.Font = Enum.Font.GothamBold
+infoLbl.TextXAlignment = Enum.TextXAlignment.Center
+
+-- OPTIMIZED FUNCTIONS
+local function isPartOfPlayer(obj)
+    if not obj or not obj.Parent then return true end
     
-    -- Reset kecepatan part agar berhenti melayang
-    task.spawn(function()
-        for _, part in ipairs(scannedParts) do
-            if part and part.Parent and part:IsA("BasePart") then
-                part.AssemblyLinearVelocity = Vector3.zero
+    local p = obj
+    for i = 1, 5 do
+        p = p.Parent
+        if not p then break end
+        if p == char then return true end
+        if Players:GetPlayerFromCharacter(p) then return true end
+    end
+    return false
+end
+
+local function refreshCache()
+    cachedParts = {}
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and not obj.Anchored and obj.CanCollide then
+            if not isPartOfPlayer(obj) then
+                table.insert(cachedParts, obj)
             end
         end
-    end)
-    
-    print("Magnet dihentikan.")
-end
-
-local function scanForParts()
-    local rangeValue = tonumber(rangeTextBox.Text)
-    if not rangeValue or rangeValue <= 0 then showNotification("Range tidak valid!", Color3.fromRGB(255, 100, 100), 3); return end
-    stopMagnet(); scannedParts = {}
-    showNotification("Mencari objek...", Color3.fromRGB(220, 220, 220)); task.wait(0.1)
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then showNotification("Karakter tidak ditemukan!", Color3.fromRGB(255, 100, 100), 3); return end
-    local playerPosition = character.HumanoidRootPart.Position
-    local partsInWorkspace = workspace:GetPartBoundsInRadius(playerPosition, rangeValue)
-    for _, part in ipairs(partsInWorkspace) do
-        if part:IsA("BasePart") and not part.Anchored and not character:IsAncestorOf(part) then
-            table.insert(scannedParts, part)
-        end
     end
-    local count = #scannedParts
-    showNotification("Scan Selesai: " .. count .. " objek ditemukan.", Color3.fromRGB(100, 255, 100), 4)
-    print("Scanning selesai. Ditemukan " .. count .. " part.")
+    
+    print("🔄 Cache Refreshed: " .. #cachedParts .. " parts found")
 end
 
-local function playMagnet()
-    if isMagnetActive then return false end
-    local powerValue = tonumber(powerTextBox.Text)
-    if not powerValue or powerValue <= 0 then showNotification("Power tidak valid!", Color3.fromRGB(255, 100, 100), 3); return false end
-    magnetPower = powerValue
-    if #scannedParts == 0 then showNotification("Tidak ada objek hasil scan. Scan dulu!", Color3.fromRGB(255, 200, 100), 3); return false end
-    isMagnetActive = true
-    print("Magnet dimulai pada " .. #scannedParts .. " part yang di-scan.")
-
-    magnetConnection = RunService.Heartbeat:Connect(function(deltaTime)
-        if not isMagnetActive then
-            if magnetConnection then magnetConnection:Disconnect(); magnetConnection = nil end
-            return
-        end
-        local character = LocalPlayer.Character
-        local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-        if not rootPart then stopMagnet(); return end
-        local playerPosition = rootPart.Position
+local function updateMode()
+    if magnetMode == "PULL" then
+        pullBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+        pullBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         
-        -- [[ PERBAIKAN SANGAT CEPAT ]]
-        -- Multiplier ditingkatkan secara signifikan (dari 50 menjadi 2500)
-        -- untuk menghasilkan gaya tarik yang sangat kuat dan instan sejak frame pertama.
-        -- Ini membuat semua objek yang di-scan langsung 'melompat' ke arah pemain
-        -- saat magnet diaktifkan, sesuai dengan permintaan.
-        local forceMultiplier = magnetPower * 2500 * deltaTime
+        pushBtn.BackgroundColor3 = Color3.fromRGB(35, 38, 42)
+        pushBtn.TextColor3 = Color3.fromRGB(120, 125, 130)
+    else
+        pushBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 30)
+        pushBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        pullBtn.BackgroundColor3 = Color3.fromRGB(35, 38, 42)
+        pullBtn.TextColor3 = Color3.fromRGB(120, 125, 130)
+    end
+end
 
-        for i = #scannedParts, 1, -1 do
-            local part = scannedParts[i]
-            if part and part.Parent then
-                local direction = (playerPosition - part.Position)
-                local distance = direction.Magnitude
-                if distance < 1 then distance = 1 end
-                
-                -- Efek magnet yang lebih kuat saat dekat
-                local velocity = direction.Unit * forceMultiplier * (1 / distance)
-                
-                -- Menetapkan kecepatan secara langsung membuat efeknya terasa seketika.
-                part.AssemblyLinearVelocity = velocity
+local connection = nil
 
-            else
-                table.remove(scannedParts, i)
+local function toggle()
+    magnetEnabled = not magnetEnabled
+    
+    if magnetEnabled then
+        toggleBtn.Text = "STOP MAGNET"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+        
+        -- Initial cache
+        refreshCache()
+        lastCacheRefresh = tick()
+        lastUpdate = tick()
+        
+        connection = RunService.Heartbeat:Connect(function()
+            local currentTime = tick()
+            
+            -- Throttle updates lebih ringan
+            if currentTime - lastUpdate < UPDATE_INTERVAL then
+                return
+            end
+            lastUpdate = currentTime
+            
+            if not char or not hrp then return end
+            
+            -- Refresh cache periodically
+            if currentTime - lastCacheRefresh > CACHE_REFRESH_TIME then
+                refreshCache()
+                lastCacheRefresh = currentTime
+            end
+            
+            local count = 0
+            local hrpPos = hrp.Position
+            
+            -- Process cached parts
+            for i = #cachedParts, 1, -1 do
+                local obj = cachedParts[i]
+                
+                -- Validasi part
+                if not obj or not obj.Parent or obj.Anchored then
+                    table.remove(cachedParts, i)
+                    local bv = obj and obj:FindFirstChild("MagnetForce")
+                    if bv then bv:Destroy() end
+                else
+                    -- Cek jarak dengan pcall untuk keamanan
+                    local success, dist = pcall(function()
+                        return (obj.Position - hrpPos).Magnitude
+                    end)
+                    
+                    if success and dist <= magnetRange and dist > 3 then
+                        local dir
+                        if magnetMode == "PULL" then
+                            dir = (hrpPos - obj.Position).Unit
+                        else
+                            dir = (obj.Position - hrpPos).Unit
+                        end
+                        
+                        -- Cari atau buat BodyVelocity
+                        local bv = obj:FindFirstChild("MagnetForce")
+                        if not bv then
+                            bv = Instance.new("BodyVelocity")
+                            bv.Name = "MagnetForce"
+                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                            bv.P = 1250
+                            bv.Parent = obj
+                        end
+                        
+                        bv.Velocity = dir * magnetPower
+                        count = count + 1
+                    else
+                        -- Hapus force jika di luar range
+                        local bv = obj:FindFirstChild("MagnetForce")
+                        if bv then 
+                            bv:Destroy() 
+                        end
+                    end
+                end
+            end
+            
+            infoLbl.Text = "Parts Affected: " .. count
+        end)
+    else
+        toggleBtn.Text = "START MAGNET"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 80)
+        
+        if connection then
+            connection:Disconnect()
+        end
+        
+        -- Clean up all forces
+        for i = 1, #cachedParts do
+            local obj = cachedParts[i]
+            if obj and obj.Parent then
+                local bv = obj:FindFirstChild("MagnetForce")
+                if bv then bv:Destroy() end
             end
         end
-    end)
-    return true
-end
-
--- ====================================================================
--- == LOGIKA FE REMOVE OBJEK                                         ==
--- ====================================================================
-local function onTouch(hit)
-    if not hit or not hit.Parent or hit:IsA("Terrain") then return end
-    if Players:GetPlayerFromCharacter(hit.Parent) or (LocalPlayer.Character and hit.Parent == LocalPlayer.Character) then return end
-    if hit:IsA("BasePart") and not hit.Anchored then pcall(function() hit.CFrame = CFrame.new(hit.Position.X, -10000, hit.Position.Z) end) end
-end
-
-local function detachTouchListeners()
-    for _, conn in ipairs(touchConnections) do conn:Disconnect() end
-    table.clear(touchConnections); print("FE Remove Objek dinonaktifkan.")
-end
-
-local function attachTouchListeners(character)
-    detachTouchListeners()
-    if not character then return end
-    for _, part in ipairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then table.insert(touchConnections, part.Touched:Connect(onTouch)) end
+        
+        cachedParts = {}
+        infoLbl.Text = "Parts Affected: 0"
     end
-    print("FE Remove Objek diaktifkan.")
 end
 
--- ====================================================================
-local function InitializeMagnetGUI()
-    if CoreGui:FindFirstChild("MagnetGUI") then CoreGui:FindFirstChild("MagnetGUI"):Destroy() end
-    local ScreenGui = Instance.new("ScreenGui", CoreGui); ScreenGui.Name = "MagnetGUI"; ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; ScreenGui.ResetOnSpawn = false
-    local MainFrame = Instance.new("Frame", ScreenGui); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 180, 0, 85)
-    MainFrame.Position = UDim2.new(0.1, 0, 0.5, -55); MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); MainFrame.BackgroundTransparency = 0.5
-    MainFrame.ClipsDescendants = true; local MainUICorner = Instance.new("UICorner", MainFrame); MainUICorner.CornerRadius = UDim.new(0, 8)
-    local UIStroke = Instance.new("UIStroke", MainFrame); UIStroke.Color = Color3.fromRGB(0, 150, 255); UIStroke.Thickness = 1.5
-    local TitleBar = Instance.new("TextButton", MainFrame); TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 25); TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    TitleBar.Text = ""; TitleBar.AutoButtonColor = false; MakeDraggable(MainFrame, TitleBar)
-    local TitleLabel = Instance.new("TextLabel", TitleBar); TitleLabel.Size = UDim2.new(1, 0, 1, 0); TitleLabel.BackgroundTransparency = 1; TitleLabel.Text = "Magnet"
-    TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255); TitleLabel.TextSize = 12; TitleLabel.Font = Enum.Font.SourceSansBold
-
-    local masterToggleFrame = createToggle(MainFrame, "Magnet Objek", false, function(isEnabled)
-        local contentFrame = MainFrame:FindFirstChild("ContentFrame"); if contentFrame then contentFrame.Visible = isEnabled end
-        -- PERBAIKAN: Ukuran frame disesuaikan agar semua muat
-        local targetSize = isEnabled and UDim2.new(0, 180, 0, 160) or UDim2.new(0, 180, 0, 85)
-        TweenService:Create(MainFrame, TweenInfo.new(0.2), {Size = targetSize}):Play()
-        if not isEnabled then stopMagnet(); wasMagnetActive = false end
-    end)
-    masterToggleFrame.Position = UDim2.new(0, 5, 0, 30); masterToggleFrame.Size = UDim2.new(1, -10, 0, 25)
-
-    local feRemoveToggleFrame = createToggle(MainFrame, "FE Hapus Objek", isRemoveEnabled, function(isEnabled)
-        isRemoveEnabled = isEnabled
-        if isEnabled then attachTouchListeners(LocalPlayer.Character) else detachTouchListeners() end
-    end)
-    feRemoveToggleFrame.Position = UDim2.new(0, 5, 0, 58); feRemoveToggleFrame.Size = UDim2.new(1, -10, 0, 25)
-
-    local ContentFrame = Instance.new("Frame", MainFrame); ContentFrame.Name = "ContentFrame"; ContentFrame.Size = UDim2.new(1, -10, 1, -88)
-    ContentFrame.Position = UDim2.new(0, 5, 0, 86); ContentFrame.BackgroundTransparency = 1; ContentFrame.Visible = false
-    local ContentLayout = Instance.new("UIListLayout", ContentFrame); ContentLayout.Padding = UDim.new(0, 5); ContentLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+-- Minimize Function
+local function toggleMinimize()
+    minimized = not minimized
     
-    local controlsRow = Instance.new("Frame", ContentFrame); controlsRow.BackgroundTransparency = 1; controlsRow.Size = UDim2.new(1, 0, 0, 30)
-    local rowLayout = Instance.new("UIListLayout", controlsRow); rowLayout.FillDirection = Enum.FillDirection.Horizontal; rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center; rowLayout.Padding = UDim.new(0, 5)
+    if minimized then
+        main:TweenSize(UDim2.new(0, 350, 0, 48), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+        content.Visible = false
+        minBtn.Text = "□"
+    else
+        main:TweenSize(UDim2.new(0, 350, 0, 280), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+        content.Visible = true
+        minBtn.Text = "-"
+    end
+end
 
-    toggleButton = Instance.new("TextButton", controlsRow); toggleButton.Name = "ToggleButton"; toggleButton.Size = UDim2.new(0, 30, 1, 0)
-    toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100); toggleButton.Text = "▶️"; toggleButton.TextColor3 = Color3.new(1, 1, 1)
-    toggleButton.Font = Enum.Font.SourceSansBold; toggleButton.TextSize = 16; local tc = Instance.new("UICorner", toggleButton); tc.CornerRadius = UDim.new(0, 5)
+-- Connections
+toggleBtn.MouseButton1Click:Connect(toggle)
+
+pullBtn.MouseButton1Click:Connect(function()
+    magnetMode = "PULL"
+    updateMode()
+end)
+
+pushBtn.MouseButton1Click:Connect(function()
+    magnetMode = "PUSH"
+    updateMode()
+end)
+
+minBtn.MouseButton1Click:Connect(toggleMinimize)
+
+closeBtn.MouseButton1Click:Connect(function()
+    if connection then connection:Disconnect() end
     
-    local scanButton = Instance.new("TextButton", controlsRow); scanButton.Name = "ScanButton"; scanButton.Size = UDim2.new(0, 30, 1, 0)
-    scanButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255); scanButton.Text = "📡"; scanButton.TextColor3 = Color3.new(1, 1, 1)
-    scanButton.Font = Enum.Font.SourceSansBold; scanButton.TextSize = 16; local sc = Instance.new("UICorner", scanButton); sc.CornerRadius = UDim.new(0, 5)
-    scanButton.MouseButton1Click:Connect(scanForParts)
-    
-    powerTextBox = createCompactTextBox(controlsRow, "Power", magnetPower); rangeTextBox = createCompactTextBox(controlsRow, "Range", magnetRange)
-
-    local directionFrame = Instance.new("Frame", ContentFrame); directionFrame.BackgroundTransparency = 1; directionFrame.Size = UDim2.new(1, 0, 0, 25)
-	local directionDropdown = Instance.new("TextButton", directionFrame); directionDropdown.Name = "Dropdown"; directionDropdown.Size = UDim2.new(1, 0, 1, 0)
-	directionDropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 60); directionDropdown.TextColor3 = Color3.fromRGB(220, 220, 220); directionDropdown.Text = "Arah: Ke Karakter"
-	directionDropdown.Font = Enum.Font.SourceSans; directionDropdown.TextSize = 12; local c = Instance.new("UICorner", directionDropdown); c.CornerRadius = UDim.new(0, 4)
-	local options = {"Ke Karakter", "Acak"}; local currentOption = 1
-	directionDropdown.MouseButton1Click:Connect(function()
-		currentOption = currentOption % #options + 1; magnetDirection = options[currentOption]; directionDropdown.Text = "Arah: " .. magnetDirection
-	end)
-
-    local function toggleMagnet()
-        if isMagnetActive then
-            stopMagnet(); wasMagnetActive = false; toggleButton.Text = "▶️"; toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        else
-            if playMagnet() then wasMagnetActive = true; toggleButton.Text = "⏹️"; toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end
+    for i = 1, #cachedParts do
+        local obj = cachedParts[i]
+        if obj and obj.Parent then
+            local bv = obj:FindFirstChild("MagnetForce")
+            if bv then bv:Destroy() end
         end
     end
-    toggleButton.MouseButton1Click:Connect(toggleMagnet)
-end
+    
+    gui:Destroy()
+end)
 
-local function InitializeNotificationGUI()
-    if CoreGui:FindFirstChild("ScanNotificationGui") then CoreGui:FindFirstChild("ScanNotificationGui"):Destroy() end
-    local ScreenGui = Instance.new("ScreenGui", CoreGui); ScreenGui.Name = "ScanNotificationGui"; ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; ScreenGui.ResetOnSpawn = false
-    notificationFrame = Instance.new("Frame", ScreenGui); notificationFrame.Name = "NotificationFrame"; notificationFrame.Size = UDim2.new(0, 280, 0, 35)
-    notificationFrame.Position = UDim2.new(0.5, -140, 1, -80); notificationFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    notificationFrame.BackgroundTransparency = 1; notificationFrame.Visible = false; local corner = Instance.new("UICorner", notificationFrame); corner.CornerRadius = UDim.new(0, 6)
-    local stroke = Instance.new("UIStroke", notificationFrame); stroke.Color = Color3.fromRGB(80, 80, 80); stroke.Thickness = 1
-    notificationLabel = Instance.new("TextLabel", notificationFrame); notificationLabel.Name = "NotificationLabel"; notificationLabel.Size = UDim2.new(1, 0, 1, 0); notificationLabel.BackgroundTransparency = 1
-    notificationLabel.Font = Enum.Font.SourceSansBold; notificationLabel.Text = ""; notificationLabel.TextColor3 = Color3.fromRGB(255, 255, 255); notificationLabel.TextSize = 14; notificationLabel.TextTransparency = 1
-end
-
-InitializeMagnetGUI(); InitializeNotificationGUI()
-
-local function handleRespawn(character)
-    task.wait(0.5)
-    if wasMagnetActive and playMagnet() then
-        local magnetGui = CoreGui:FindFirstChild("MagnetGUI", true)
-        local currentToggleButton = magnetGui and magnetGui:FindFirstChild("ToggleButton", true)
-        if currentToggleButton then currentToggleButton.Text = "⏹️"; currentToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end
+-- Input Handling
+powerInput.FocusLost:Connect(function(enter)
+    local num = tonumber(powerInput.Text)
+    if num and num >= 1 then
+        magnetPower = num
+    else
+        powerInput.Text = tostring(magnetPower)
     end
-    if isRemoveEnabled then attachTouchListeners(character) end
-end
+end)
 
-LocalPlayer.CharacterAdded:Connect(handleRespawn)
+rangeInput.FocusLost:Connect(function(enter)
+    local num = tonumber(rangeInput.Text)
+    if num and num >= 1 then
+        magnetRange = num
+    else
+        rangeInput.Text = tostring(magnetRange)
+    end
+end)
 
-print("Magnet.lua (Versi Sangat Cepat) loaded.")
+-- Init
+updateMode()
 
+-- Respawn
+player.CharacterAdded:Connect(function(newChar)
+    task.wait(0.5)
+    char = newChar
+    hrp = char:WaitForChild("HumanoidRootPart")
+    
+    if magnetEnabled then
+        refreshCache()
+    end
+end)
 
+print("✅ Warpah Exploit Loaded! (OPTIMIZED)")
+print("🎨 Design: Clean Panel Style")
+print("⚡ Performance: No Lag | Throttled Updates")
+print("📊 Radius: 100 studs | FE Compatible")
