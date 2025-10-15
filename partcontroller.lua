@@ -1,6 +1,10 @@
--- Arexans Part Controller v4.3 (Revisi Stabilitas & UX oleh Gemini)
+-- Arexans Part Controller v4.3.4 (Revisi UI oleh Gemini)
 -- Perbaikan: Fitur geser jendela yang tidak mengganggu kamera dan alur tombol scan yang lebih jelas.
-print("Loading Arexans Part Controller v4.3...")
+-- Perbaikan v4.3.1: Mengganti dropdown mode dengan tombol < > untuk efisiensi ruang.
+-- Perbaikan v4.3.2: Menyederhanakan baris kontrol utama (toggle, scan, destroy) menjadi ikon dalam satu baris.
+-- Perbaikan v4.3.3: Menggabungkan semua kontrol utama (toggle, scan, destroy, mode) ke dalam satu baris tunggal yang ringkas.
+-- Perbaikan v4.3.4: Mengatur ulang baris kontrol (Mode, Scan, Destroy, Toggle) dan menggabungkan setting ke 1 baris.
+print("Loading Arexans Part Controller v4.3.4...")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -28,7 +32,8 @@ local state = {
     parts = {},
     timeOffset = 0,
     connection = nil,
-    bodyPositions = {}
+    bodyPositions = {},
+    currentModeIndex = 1
 }
 
 -- Modes (Fungsi tetap sama)
@@ -66,9 +71,7 @@ local function getLook() return player.Character and player.Character:FindFirstC
 -- Clean all BodyPositions
 local function cleanBodyPositions()
     for _, bp in pairs(state.bodyPositions) do
-        if bp and bp.Parent then
-            bp:Destroy()
-        end
+        if bp and bp.Parent then bp:Destroy() end
     end
     state.bodyPositions = {}
 end
@@ -77,34 +80,18 @@ end
 local function destroyRopes()
     log("Destroying all ropes...")
     local r,w,a = 0,0,0
-    
     for _,obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("RopeConstraint") then
-            pcall(function()
-                obj.Visible=false 
-                obj.Enabled=false 
-                obj.Length=0
-                local a0,a1 = obj.Attachment0,obj.Attachment1
-                obj:Destroy() 
-                r=r+1
-                if a0 and a0.Parent then a0:Destroy() a=a+1 end
-                if a1 and a1.Parent then a1:Destroy() a=a+1 end
-            end)
+            pcall(function() local a0,a1=obj.Attachment0,obj.Attachment1; obj:Destroy(); r=r+1; if a0 and a0.Parent then a0:Destroy() a=a+1 end if a1 and a1.Parent then a1:Destroy() a=a+1 end end)
         elseif obj:IsA("WeldConstraint") or obj:IsA("Weld") then
             pcall(function() obj:Destroy() w=w+1 end)
         elseif obj:IsA("Attachment") and not obj.Parent:FindFirstChildOfClass("Humanoid") then
             pcall(function() obj:Destroy() a=a+1 end)
         end
     end
-    
     for _,obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and not obj:IsDescendantOf(player.Character) then 
-            pcall(function() 
-                obj:BreakJoints()
-            end) 
-        end
+        if obj:IsA("BasePart") and not obj:IsDescendantOf(player.Character) then pcall(function() obj:BreakJoints() end) end
     end
-    
     log("Destroyed: "..r.." ropes, "..w.." welds, "..a.." attachments")
     return r+w+a
 end
@@ -114,27 +101,16 @@ local function scan()
     log("Starting new scan...")
     state.parts = {}
     cleanBodyPositions()
-    
     local p = getPos()
-    if not p then 
-        log("Cannot scan - Player position not found")
-        return {} 
-    end
-    
+    if not p then log("Cannot scan - Player position not found") return {} end
     local scanned = 0
     for _,obj in pairs(workspace:GetDescendants()) do
         if scanned >= config.partLimit then break end
-        
         if obj:IsA("BasePart") and not(player.Character and obj:IsDescendantOf(player.Character)) then
-            local dist = (obj.Position - p).Magnitude
-            if dist <= config.radius then
+            if (obj.Position - p).Magnitude <= config.radius then
                 pcall(function()
                     obj:BreakJoints()
-                    for _,c in pairs(obj:GetChildren()) do
-                        if c:IsA("Constraint") or c:IsA("Attachment") or c:IsA("Weld") then 
-                            c:Destroy() 
-                        end
-                    end
+                    for _,c in pairs(obj:GetChildren()) do if c:IsA("Constraint") or c:IsA("Attachment") or c:IsA("Weld") then c:Destroy() end end
                     obj.Anchored = false
                     obj.CanCollide = false
                     table.insert(state.parts, obj)
@@ -143,7 +119,6 @@ local function scan()
             end
         end
     end
-    
     log("Scanned "..#state.parts.." parts in radius "..config.radius)
     return state.parts
 end
@@ -151,24 +126,13 @@ end
 -- Apply force
 local function force(part, targetPos)
     if not part or not part.Parent then return end
-    
     pcall(function()
         part.Anchored = false
         part.CanCollide = false
-        
-        for _, child in pairs(part:GetChildren()) do
-            if child:IsA("BodyPosition") or child:IsA("BodyVelocity") or child:IsA("BodyGyro") then
-                child:Destroy()
-            end
-        end
-        
+        for _, child in pairs(part:GetChildren()) do if child:IsA("BodyPosition") or child:IsA("BodyVelocity") or child:IsA("BodyGyro") then child:Destroy() end end
         local bp = Instance.new("BodyPosition")
         bp.MaxForce = Vector3.new(config.magnetForce, config.magnetForce, config.magnetForce)
-        bp.Position = targetPos
-        bp.P = 10000
-        bp.D = 500
-        bp.Parent = part
-        
+        bp.Position = targetPos; bp.P = 10000; bp.D = 500; bp.Parent = part
         table.insert(state.bodyPositions, bp)
     end)
 end
@@ -204,8 +168,8 @@ local function createGUI()
     gui.DisplayOrder = 11
 
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0,180,0,290)
-    frame.Position = UDim2.new(0.5,-90,0.5,-145)
+    frame.Size = UDim2.new(0,250,0,115) -- Jendela dibuat lebih pendek (rapat ke atas)
+    frame.Position = UDim2.new(0.5,-125,0.5,-57.5)
     frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     frame.BackgroundTransparency = 0.5
     frame.BorderSizePixel = 0
@@ -214,69 +178,31 @@ local function createGUI()
     local frameCorner = Instance.new("UICorner",frame); frameCorner.CornerRadius = UDim.new(0,6)
     local frameStroke = Instance.new("UIStroke",frame); frameStroke.Color = Color3.fromRGB(0, 150, 255); frameStroke.Thickness = 1.5; frameStroke.Transparency = 0.5
     
-    -- Bilah judul diubah menjadi TextButton untuk properti Modal, tapi tampilan tetap sama
     local titleBar = Instance.new("TextButton",frame) 
-    titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1,0,0,25)
-    titleBar.BackgroundColor3 = Color3.fromRGB(25,25,25)
-    titleBar.BorderSizePixel = 0
-    titleBar.Text = "" -- Kosongkan teks agar tidak mengganggu
-    titleBar.AutoButtonColor = false -- Matikan efek klik visual
+    titleBar.Name = "TitleBar"; titleBar.Size = UDim2.new(1,0,0,25); titleBar.BackgroundColor3 = Color3.fromRGB(25,25,25); titleBar.BorderSizePixel = 0; titleBar.Text = ""; titleBar.AutoButtonColor = false 
     
     local title = Instance.new("TextLabel",titleBar)
-    title.Size = UDim2.new(1,-45,1,0)
-    title.Position = UDim2.new(0,8,0,0)
-    title.BackgroundTransparency = 1
-    title.Text = "Part Controller"
-    title.TextColor3 = Color3.fromRGB(0,200,255)
-    title.TextSize = 12
-    title.Font = Enum.Font.SourceSansBold
-    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Size = UDim2.new(1,-45,1,0); title.Position = UDim2.new(0,8,0,0); title.BackgroundTransparency = 1; title.Text = "Part Controller"; title.TextColor3 = Color3.fromRGB(0,200,255); title.TextSize = 12; title.Font = Enum.Font.SourceSansBold; title.TextXAlignment = Enum.TextXAlignment.Left
 
     local closeBtn = Instance.new("TextButton",titleBar)
-    closeBtn.Size = UDim2.new(0,18,0,18)
-    closeBtn.Position = UDim2.new(1,-22,0,3.5)
-    closeBtn.BackgroundTransparency = 1
-    closeBtn.Font = Enum.Font.SourceSansBold
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.TextSize = 16
+    closeBtn.Size = UDim2.new(0,18,0,18); closeBtn.Position = UDim2.new(1,-22,0,3.5); closeBtn.BackgroundTransparency = 1; closeBtn.Font = Enum.Font.SourceSansBold; closeBtn.Text = "X"; closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); closeBtn.TextSize = 16
 
     local minimizeBtn = Instance.new("TextButton", titleBar)
-    minimizeBtn.Size = UDim2.new(0, 18, 0, 18)
-    minimizeBtn.Position = UDim2.new(1, -42, 0, 3.5)
-    minimizeBtn.BackgroundTransparency = 1
-    minimizeBtn.Font = Enum.Font.SourceSansBold
-    minimizeBtn.Text = "-"
-    minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    minimizeBtn.TextSize = 20
+    minimizeBtn.Size = UDim2.new(0, 18, 0, 18); minimizeBtn.Position = UDim2.new(1, -42, 0, 3.5); minimizeBtn.BackgroundTransparency = 1; minimizeBtn.Font = Enum.Font.SourceSansBold; minimizeBtn.Text = "-"; minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); minimizeBtn.TextSize = 20
 
-    -- [[ FUNGSI GESER JENDELA BARU YANG TIDAK MENGGANGGU KAMERA ]] --
     local function makeDraggableAndSinkInput(frameToDrag, handle)
-        handle.Modal = true -- Kunci utama: Menyerap input agar tidak tembus ke game
-        local isDragging = false
-        
+        handle.Modal = true; local isDragging = false
         handle.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                isDragging = true
-                local startPosition = input.Position
-                local frameStartPosition = frameToDrag.Position
-                
-                local moveConnection
-                moveConnection = UserInputService.InputChanged:Connect(function(moveInput)
+                isDragging = true; local startPosition = input.Position; local frameStartPosition = frameToDrag.Position
+                local moveConnection; moveConnection = UserInputService.InputChanged:Connect(function(moveInput)
                     if (moveInput.UserInputType == Enum.UserInputType.MouseMovement or moveInput.UserInputType == Enum.UserInputType.Touch) and isDragging then
                         local delta = moveInput.Position - startPosition
                         frameToDrag.Position = UDim2.new(frameStartPosition.X.Scale, frameStartPosition.X.Offset + delta.X, frameStartPosition.Y.Scale, frameStartPosition.Y.Offset + delta.Y)
                     end
                 end)
-                
-                local endConnection
-                endConnection = UserInputService.InputEnded:Connect(function(endInput)
-                    if endInput.UserInputType == input.UserInputType then
-                        isDragging = false
-                        moveConnection:Disconnect()
-                        endConnection:Disconnect()
-                    end
+                local endConnection; endConnection = UserInputService.InputEnded:Connect(function(endInput)
+                    if endInput.UserInputType == input.UserInputType then isDragging = false; moveConnection:Disconnect(); endConnection:Disconnect() end
                 end)
             end
         end)
@@ -284,28 +210,33 @@ local function createGUI()
     makeDraggableAndSinkInput(frame, titleBar)
 
     local contentScroll = Instance.new("ScrollingFrame",frame)
-    contentScroll.Size = UDim2.new(1,-10,1,-30)
-    contentScroll.Position = UDim2.new(0,5,0,25)
-    contentScroll.BackgroundTransparency = 1
-    contentScroll.BorderSizePixel = 0
-    contentScroll.ScrollBarThickness = 3
-    contentScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
+    contentScroll.Size = UDim2.new(1,-10,1,-30); contentScroll.Position = UDim2.new(0,5,0,25); contentScroll.BackgroundTransparency = 1; contentScroll.BorderSizePixel = 0; contentScroll.ScrollBarThickness = 3; contentScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 150, 255)
 
     local contentLayout = Instance.new("UIListLayout", contentScroll)
     contentLayout.Padding = UDim.new(0, 4)
 
     local function createButton(parent, name, callback)
-        local button = Instance.new("TextButton"); button.Size = UDim2.new(1,0,0,20); button.BackgroundColor3 = Color3.fromRGB(0,120,255); button.BorderSizePixel = 0; button.Text = name; button.TextColor3 = Color3.fromRGB(255,255,255); button.TextSize = 11; button.Font = Enum.Font.SourceSansBold; button.Parent = parent; local c = Instance.new("UICorner",button); c.CornerRadius = UDim.new(0,4); button.MouseButton1Click:Connect(callback); return button
+        local button = Instance.new("TextButton"); button.BackgroundColor3 = Color3.fromRGB(0,120,255); button.BorderSizePixel = 0; button.Text = name; button.TextColor3 = Color3.fromRGB(255,255,255); button.TextSize = 11; button.Font = Enum.Font.SourceSansBold; button.Parent = parent; local c = Instance.new("UICorner",button); c.CornerRadius = UDim.new(0,4); button.MouseButton1Click:Connect(callback); return button
     end
-    local function createToggle(parent, name, initialState, callback)
-        local f=Instance.new("Frame",parent);f.Size=UDim2.new(1,0,0,22);f.BackgroundTransparency=1;local l=Instance.new("TextLabel",f);l.Size=UDim2.new(0.8,-10,1,0);l.Position=UDim2.new(0,5,0,0);l.BackgroundTransparency=1;l.Text=name;l.TextColor3=Color3.fromRGB(255,255,255);l.TextSize=11;l.TextXAlignment=Enum.TextXAlignment.Left;l.Font=Enum.Font.SourceSans;local s=Instance.new("TextButton",f);s.Name="Switch";s.Size=UDim2.new(0,36,0,18);s.Position=UDim2.new(1,-45,0.5,-9);s.BackgroundColor3=Color3.fromRGB(50,50,50);s.BorderSizePixel=0;s.Text="";local sc=Instance.new("UICorner",s);sc.CornerRadius=UDim.new(1,0);local t=Instance.new("Frame",s);t.Name="Thumb";t.Size=UDim2.new(0,14,0,14);t.Position=UDim2.new(0,2,0.5,-7);t.BackgroundColor3=Color3.fromRGB(220,220,220);t.BorderSizePixel=0;local tc=Instance.new("UICorner",t);tc.CornerRadius=UDim.new(1,0);local onC,offC=Color3.fromRGB(0,150,255),Color3.fromRGB(60,60,60);local onP,offP=UDim2.new(1,-16,0.5,-7),UDim2.new(0,2,0.5,-7);local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quint,Enum.EasingDirection.Out);local tog=initialState;local function update(i) local gp,gc=tog and onP or offP,tog and onC or offC;if i then t.Position,s.BackgroundColor3=gp,gc else TweenService:Create(t,ti,{Position=gp}):Play();TweenService:Create(s,ti,{BackgroundColor3=gc}):Play() end end;s.MouseButton1Click:Connect(function() tog=not tog;update(false);callback(tog) end);update(true);return f,s
+    local function createToggle(parent, initialState, callback)
+        local s=Instance.new("TextButton",parent);s.Name="Switch";s.Size=UDim2.new(0,36,0,20);s.BackgroundColor3=Color3.fromRGB(50,50,50);s.BorderSizePixel=0;s.Text="";local sc=Instance.new("UICorner",s);sc.CornerRadius=UDim.new(1,0);local t=Instance.new("Frame",s);t.Name="Thumb";t.Size=UDim2.new(0,16,0,16);t.Position=UDim2.new(0,2,0.5,-8);t.BackgroundColor3=Color3.fromRGB(220,220,220);t.BorderSizePixel=0;local tc=Instance.new("UICorner",t);tc.CornerRadius=UDim.new(1,0);local onC,offC=Color3.fromRGB(0,150,255),Color3.fromRGB(60,60,60);local onP,offP=UDim2.new(1,-18,0.5,-8),UDim2.new(0,2,0.5,-8);local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quint,Enum.EasingDirection.Out);local tog=initialState;local function update(i) local gp,gc=tog and onP or offP,tog and onC or offC;if i then t.Position,s.BackgroundColor3=gp,gc else TweenService:Create(t,ti,{Position=gp}):Play();TweenService:Create(s,ti,{BackgroundColor3=gc}):Play() end end;s.MouseButton1Click:Connect(function() tog=not tog;update(false);callback(tog) end);update(true);return s
     end
-    local function createTextBox(parent, name, initialValue, callback)
-        local f = Instance.new("Frame", parent); f.Size = UDim2.new(1, 0, 0, 22); f.BackgroundTransparency = 1
-        local l = Instance.new("TextLabel", f); l.Size = UDim2.new(0.5, -5, 1, 0); l.Position = UDim2.new(0, 5, 0, 0); l.BackgroundTransparency = 1; l.Text = name; l.TextColor3 = Color3.fromRGB(220, 220, 220); l.TextSize = 11; l.Font = Enum.Font.SourceSans; l.TextXAlignment = Enum.TextXAlignment.Left
-        local tb = Instance.new("TextBox", f); tb.Size = UDim2.new(0.5, -5, 1, 0); tb.Position = UDim2.new(0.5, 0, 0, 0); tb.BackgroundColor3 = Color3.fromRGB(35, 35, 35); tb.BorderSizePixel = 0; tb.TextColor3 = Color3.fromRGB(255, 255, 255); tb.TextSize = 11; tb.Font = Enum.Font.SourceSans; tb.Text = tostring(initialValue); tb.ClearTextOnFocus = false
+    -- Fungsi untuk membuat Text Input Box (tidak termasuk label)
+    local function createPureTextBox(parent, initialValue, callback, name, widthScale)
+        local tb = Instance.new("TextBox", parent)
+        tb.Name = name or "TextBox"
+        tb.Size = UDim2.new(widthScale or 0.5, -5, 1, 0)
+        tb.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        tb.BorderSizePixel = 0
+        tb.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tb.TextSize = 11
+        tb.Font = Enum.Font.SourceSans
+        tb.Text = tostring(initialValue)
+        tb.ClearTextOnFocus = false
+        tb.TextXAlignment = Enum.TextXAlignment.Center
         local c = Instance.new("UICorner", tb); c.CornerRadius = UDim.new(0, 4)
         local s = Instance.new("UIStroke", tb); s.Color = Color3.fromRGB(80, 80, 80); s.Thickness = 1
+        
         tb.FocusLost:Connect(function(enterPressed)
             local num = tonumber(tb.Text)
             if num then
@@ -314,81 +245,80 @@ local function createGUI()
                 tb.Text = tostring(initialValue)
             end
         end)
-        return f
+        return tb
     end
 
     local statusLabel = Instance.new("TextLabel", contentScroll)
-    statusLabel.Size = UDim2.new(1,0,0,15)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "Parts: 0"
-    statusLabel.TextColor3 = Color3.fromRGB(180,180,180)
-    statusLabel.TextSize = 10
-    statusLabel.Font = Enum.Font.SourceSans
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Size = UDim2.new(1,0,0,15); statusLabel.BackgroundTransparency = 1; statusLabel.Text = "Parts: 0"; statusLabel.TextColor3 = Color3.fromRGB(180,180,180); statusLabel.TextSize = 10; statusLabel.Font = Enum.Font.SourceSans; statusLabel.TextXAlignment = Enum.TextXAlignment.Left
 	
-    -- [[ LOGIKA TOMBOL SCAN BARU ]] --
-    local isScanning = false
-    local scanBtn = createButton(contentScroll, "Scan Parts", function()
-        if isScanning then return end
-        isScanning = true
-        
-        statusLabel.Text = "Scanning..."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 180, 80) -- Warna oranye saat loading
-    
-        task.spawn(function()
-            task.wait() -- Tunggu frame berikutnya agar UI sempat update
-            local foundParts = scan()
-            
-            statusLabel.Text = "Found: " .. #foundParts .. " parts"
-            statusLabel.TextColor3 = Color3.fromRGB(120, 255, 120) -- Warna hijau tanda sukses
-            
-            isScanning = false
-        end)
-    end)
-    
-    local destroyBtn = createButton(contentScroll, "Destroy All Ropes", function()
-        destroyBtn.Text = "Destroying..."
-        task.spawn(function()
-            local n = destroyRopes()
-            destroyBtn.Text = "Destroyed "..n
-            task.wait(2)
-            destroyBtn.Text = "Destroy All Ropes"
-        end)
-    end)
-    destroyBtn.BackgroundColor3 = Color3.fromRGB(200,50,50)
+    -- [[ BARIS KONTROL UTAMA (Mode, Scan, Destroy, Toggle) ]] --
+    local mainControlBar = Instance.new("Frame", contentScroll)
+    mainControlBar.Size = UDim2.new(1, 0, 0, 30)
+    mainControlBar.BackgroundTransparency = 1
 
-    createTextBox(contentScroll, "Scan Radius", config.radius, function(v) config.radius = v end)
-    createTextBox(contentScroll, "Anim Speed", config.speed, function(v) config.speed = v; config.launchSpeed = v * 20 end)
+    local controlLayout = Instance.new("UIListLayout", mainControlBar)
+    controlLayout.FillDirection = Enum.FillDirection.Horizontal
+    controlLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    controlLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    controlLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left -- Mulai dari kiri
+    controlLayout.Padding = UDim.new(0, 4)
 
-    local modeDropdownFrame = Instance.new("Frame", contentScroll)
-    modeDropdownFrame.Size = UDim2.new(1,0,0,20)
-    modeDropdownFrame.BackgroundTransparency = 1
+    -- 1. Pemilih Mode
+    local modeFrame = Instance.new("Frame", mainControlBar)
+    modeFrame.Size = UDim2.new(0, 120, 1, 0)
+    modeFrame.BackgroundTransparency = 1
+    modeFrame.LayoutOrder = 1
     
-    local modeBtn = createButton(modeDropdownFrame, "Mode: Bring", function() end)
+    local modeLayout = Instance.new("UIListLayout", modeFrame)
+    modeLayout.FillDirection = Enum.FillDirection.Horizontal
+    modeLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    modeLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    modeLayout.Padding = UDim.new(0, 1)
+
+    local prevBtn = createButton(modeFrame, "<", function() end)
+    prevBtn.Size = UDim2.new(0, 18, 0, 24); prevBtn.TextSize = 16
     
-    local modeScroll = Instance.new("ScrollingFrame", contentScroll)
-    modeScroll.Size = UDim2.new(1,0,0,100)
-    modeScroll.BackgroundTransparency = 1
-    modeScroll.Visible = false
-    modeScroll.BorderSizePixel = 0
-    modeScroll.BackgroundColor3 = Color3.fromRGB(35,35,35)
-    modeScroll.ScrollBarThickness = 3
-    local modeScrollCorner = Instance.new("UICorner",modeScroll); modeScrollCorner.CornerRadius = UDim.new(0,5)
-    local modeListLayout = Instance.new("UIListLayout", modeScroll)
-    modeListLayout.Padding = UDim.new(0,2)
+    local modeDisplay = Instance.new("TextLabel", modeFrame)
+    modeDisplay.Size = UDim2.new(0, 60, 1, 0); modeDisplay.BackgroundTransparency = 1; modeDisplay.Font = Enum.Font.SourceSansBold; modeDisplay.TextSize = 11; modeDisplay.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-    modeBtn.MouseButton1Click:Connect(function() modeScroll.Visible = not modeScroll.Visible end)
-
-    for _,m in ipairs(MODES) do
-        local opt = createButton(modeScroll, m.n, function()
-            state.mode = m.v
-            modeBtn.Text = "Mode: "..m.n
-            modeScroll.Visible = false
-        end)
-        opt.BackgroundColor3 = Color3.fromRGB(40,40,60)
+    local nextBtn = createButton(modeFrame, ">", function() end)
+    nextBtn.Size = UDim2.new(0, 18, 0, 24); nextBtn.TextSize = 16
+    
+    local function updateModeDisplay()
+        local currentModeData = MODES[state.currentModeIndex]; state.mode = currentModeData.v; modeDisplay.Text = currentModeData.n
     end
     
-    local toggleFrame, toggleSwitch = createToggle(contentScroll, "Controller Active", state.active, function(isOn)
+    prevBtn.MouseButton1Click:Connect(function()
+        state.currentModeIndex = state.currentModeIndex - 1; if state.currentModeIndex < 1 then state.currentModeIndex = #MODES end; updateModeDisplay()
+    end)
+    
+    nextBtn.MouseButton1Click:Connect(function()
+        state.currentModeIndex = state.currentModeIndex + 1; if state.currentModeIndex > #MODES then state.currentModeIndex = 1 end; updateModeDisplay()
+    end)
+    updateModeDisplay()
+
+    -- 2. Tombol Scan
+    local isScanning = false
+    local scanBtn = createButton(mainControlBar, "🔍", function()
+        if isScanning then return end; isScanning = true; statusLabel.Text = "Scanning..."; statusLabel.TextColor3 = Color3.fromRGB(255, 180, 80)
+        task.spawn(function()
+            task.wait(); local foundParts = scan(); statusLabel.Text = "Found: " .. #foundParts .. " parts"; statusLabel.TextColor3 = Color3.fromRGB(120, 255, 120); isScanning = false
+        end)
+    end)
+    scanBtn.Size = UDim2.new(0, 28, 0, 28); scanBtn.TextSize = 16; scanBtn.LayoutOrder = 2
+    
+    -- 3. Tombol Destroy
+    local destroyBtn = createButton(mainControlBar, "🗑️", function()
+        local oldText = statusLabel.Text; destroyBtn.Text = "..."
+        task.spawn(function()
+            local n = destroyRopes(); destroyBtn.Text = "🗑️"; statusLabel.Text = "Destroyed "..n.." objects"; statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+            task.wait(2); statusLabel.Text = oldText; statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+        end)
+    end)
+    destroyBtn.BackgroundColor3 = Color3.fromRGB(200,50,50); destroyBtn.Size = UDim2.new(0, 28, 0, 28); destroyBtn.TextSize = 16; destroyBtn.LayoutOrder = 3
+    
+    -- 4. Tombol Toggle
+    local toggleSwitch = createToggle(mainControlBar, state.active, function(isOn)
         if isOn then
             if #state.parts == 0 then
                 log("No parts scanned, scanning now..."); scan(); statusLabel.Text = "Found: " .. #state.parts .. " parts"
@@ -398,30 +328,54 @@ local function createGUI()
             stopPartController()
         end
     end)
+    toggleSwitch.LayoutOrder = 4
+    
+    -- [[ AKHIR DARI BARIS KONTROL UTAMA ]] --
+
+    -- [[ BARIS PENGATURAN (Radius & Speed) ]] --
+    local settingBar = Instance.new("Frame", contentScroll)
+    settingBar.Size = UDim2.new(1, 0, 0, 22) -- Tinggi dibuat 22 agar rapat
+    settingBar.BackgroundTransparency = 1
+
+    local settingLayout = Instance.new("UIListLayout", settingBar)
+    settingLayout.FillDirection = Enum.FillDirection.Horizontal
+    settingLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    settingLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    settingLayout.Padding = UDim.new(0, 4)
+    
+    local function createSettingLabel(parent, text)
+        local l = Instance.new("TextLabel", parent)
+        l.Size = UDim2.new(0, 45, 1, 0)
+        l.BackgroundTransparency = 1
+        l.Text = text
+        l.TextColor3 = Color3.fromRGB(220, 220, 220)
+        l.TextSize = 11
+        l.Font = Enum.Font.SourceSans
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        return l
+    end
+    
+    -- Radius Setting
+    createSettingLabel(settingBar, "Radius:")
+    createPureTextBox(settingBar, config.radius, function(v) config.radius = v end, "RadiusInput", 0.25)
+    
+    -- Speed Setting
+    createSettingLabel(settingBar, "Speed:")
+    createPureTextBox(settingBar, config.speed, function(v) config.speed = v; config.launchSpeed = v * 20 end, "SpeedInput", 0.25)
+    
+    -- [[ AKHIR DARI BARIS PENGATURAN ]] --
     
     contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         contentScroll.CanvasSize = UDim2.new(0,0,0, contentLayout.AbsoluteContentSize.Y)
     end)
     
-    closeBtn.MouseButton1Click:Connect(function() 
-        if state.active then stopPartController() end
-        gui:Destroy() 
-    end)
+    closeBtn.MouseButton1Click:Connect(function() if state.active then stopPartController() end; gui:Destroy() end)
 
-    local isMinimized = false
-    local originalFrameSize = frame.Size
-    local minimizedFrameSize = UDim2.new(0, 180, 0, 25)
+    local isMinimized = false; local originalFrameSize = frame.Size; local minimizedFrameSize = UDim2.new(frame.Size.X.Scale, frame.Size.X.Offset, 0, 25)
     minimizeBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-        
-        if isMinimized then
-            contentScroll.Visible = false
-            TweenService:Create(frame, tweenInfo, {Size = minimizedFrameSize}):Play()
-        else
-            contentScroll.Visible = true
-            TweenService:Create(frame, tweenInfo, {Size = originalFrameSize}):Play()
-        end
+        isMinimized = not isMinimized; local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+        if isMinimized then contentScroll.Visible = false; TweenService:Create(frame, tweenInfo, {Size = minimizedFrameSize}):Play()
+        else contentScroll.Visible = true; TweenService:Create(frame, tweenInfo, {Size = originalFrameSize}):Play() end
     end)
     
     log("GUI Created Successfully!")
@@ -431,19 +385,22 @@ end
 -- Hotkeys
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
-    if input.KeyCode == Enum.KeyCode.F1 then log("F1 pressed - Scanning...") scan() local g = player.PlayerGui:FindFirstChild("ArexansPartControllerGUI") if g then local s = g:FindFirstChild("StatusLabel",true) if s then s.Text = "Parts: "..#state.parts end end
+    if input.KeyCode == Enum.KeyCode.F1 then log("F1 pressed - Scanning...") scan() local g=player.PlayerGui:FindFirstChild("ArexansPartControllerGUI") if g then local s=g:FindFirstChild("StatusLabel",true) if s then s.Text="Parts: "..#state.parts end end
     elseif input.KeyCode == Enum.KeyCode.F2 then if state.active then stopPartController() else startPartController() end
-    elseif input.KeyCode == enum.KeyCode.F4 then log("F4 pressed - Destroying ropes...") destroyRopes()
+    elseif input.KeyCode == Enum.KeyCode.F4 then log("F4 pressed - Destroying ropes...") destroyRopes()
     elseif input.KeyCode == Enum.KeyCode.F5 then stopPartController()
     end
 end)
 
 -- Initialize
 log("═══════════════════════════════════")
-log("AREXANS PART CONTROLLER v4.3 (UX Fix)")
+log("AREXANS PART CONTROLLER v4.3.4 (UI Fix)")
 log("═══════════════════════════════════")
 log("✓ Fitur geser jendela stabil & tidak mengganggu kamera.")
 log("✓ Alur tombol scan disempurnakan.")
+log("✓ Baris kontrol utama: Mode | Scan | Destroy | Toggle.")
+log("✓ Pengaturan Radius & Speed dalam 1 baris.")
+log("✓ Jendela dirapatkan ke atas.")
 log("Loading GUI...")
 task.wait(1)
 createGUI()
@@ -455,5 +412,3 @@ log("  F2 = Toggle ON/OFF")
 log("  F4 = Destroy Ropes")
 log("  F5 = Force Stop")
 log("═══════════════════════════════════")
-
-
