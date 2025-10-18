@@ -683,10 +683,11 @@ task.spawn(function()
     end
 
     -- [[ PERUBAHAN BARU: Fungsi untuk mengelola sesi login dipindahkan ke lingkup luar ]]
-    local function saveSession(expirationTimestamp)
+    local function saveSession(expirationTimestamp, userRole)
         if not writefile then return end
         local sessionData = {
-            expiration = expirationTimestamp
+            expiration = expirationTimestamp,
+            role = userRole or "Normal"
         }
         pcall(function()
             writefile(SESSION_SAVE_FILE, HttpService:JSONEncode(sessionData))
@@ -701,7 +702,7 @@ task.spawn(function()
             local content = readfile(SESSION_SAVE_FILE)
             local data = HttpService:JSONDecode(content)
             if type(data) == "table" and data.expiration and os.time() < data.expiration then
-                return data.expiration
+                return data
             end
             return nil
         end)
@@ -736,8 +737,17 @@ task.spawn(function()
     local PlayerTabContent, PlayerListContainer, GeneralTabContent, TeleportTabContent, VipTabContent, SettingsTabContent, RekamanTabContent
     local PlayerListLayout, GeneralListLayout, TeleportListLayout, VipListLayout, SettingsListLayout, RekamanListLayout
     local setupPlayerTab, setupGeneralTab, setupTeleportTab, setupVipTab, setupSettingsTab, setupRekamanTab
+    local currentUserRole = "Normal"
 
     local function InitializeMainGUI(expirationTimestamp)
+        local function checkPermission()
+            if currentUserRole == "Normal" then
+                showNotification("Silahkan upgrade ke VIP terlebih dahulu", Color3.fromRGB(255, 100, 100))
+                return false
+            end
+            return true
+        end
+
         -- Layanan dan Variabel Global
         Players = game:GetService("Players")
         UserInputService = game:GetService("UserInputService")
@@ -1692,6 +1702,9 @@ task.spawn(function()
     end
     
     local function switchTab(tabName)
+        if tabName == "VIP" and not checkPermission() then
+            return
+        end
         PlayerTabContent.Visible = (tabName == "Player"); GeneralTabContent.Visible = (tabName == "Umum"); TeleportTabContent.Visible = (tabName == "Teleport"); VipTabContent.Visible = (tabName == "VIP"); SettingsTabContent.Visible = (tabName == "Pengaturan"); RekamanTabContent.Visible = (tabName == "Rekaman")
         if tabName == "Player" and updatePlayerList then updatePlayerList() end
     end
@@ -4631,7 +4644,9 @@ task.spawn(function()
             flingButton.TextSize = 10
             local flingCorner = Instance.new("UICorner", flingButton); flingCorner.CornerRadius = UDim.new(0, 4)
             flingButton.MouseButton1Click:Connect(function()
-                ToggleFlingOnPlayer(player)
+                if checkPermission() then
+                    ToggleFlingOnPlayer(player)
+                end
             end)
     
             local newTeleportButton = Instance.new("TextButton", actionsFrame)
@@ -4757,10 +4772,10 @@ task.spawn(function()
             end
             saveFeatureStates() -- Simpan perubahan transparansi
         end)
-        createButton(GeneralTabContent, "Buka Touch Fling", CreateTouchFlingGUI)
+        createButton(GeneralTabContent, "Buka Touch Fling", function() if checkPermission() then CreateTouchFlingGUI() end end)
         createToggle(GeneralTabContent, "Anti-Fling", antifling_enabled, ToggleAntiFling)
-        createButton(GeneralTabContent, "Buka GUI Magnet", createMagnetGUI)
-        createButton(GeneralTabContent, "Buka GUI Part Controller", createPartControllerGUI)
+        createButton(GeneralTabContent, "Buka GUI Magnet", function() if checkPermission() then createMagnetGUI() end end)
+        createButton(GeneralTabContent, "Buka GUI Part Controller", function() if checkPermission() then createPartControllerGUI() end end)
     end
 
     local function setupVipTab()
@@ -4887,7 +4902,9 @@ task.spawn(function()
             flingButton.TextSize = 10
             local flingCorner = Instance.new("UICorner", flingButton); flingCorner.CornerRadius = UDim.new(0, 4)
             flingButton.MouseButton1Click:Connect(function()
-                ToggleFlingOnPlayer(player)
+                if checkPermission() then
+                    ToggleFlingOnPlayer(player)
+                end
             end)
     
             local newTeleportButton = Instance.new("TextButton", actionsFrame)
@@ -5013,10 +5030,10 @@ task.spawn(function()
             end
             saveFeatureStates() -- Simpan perubahan transparansi
         end)
-        createButton(GeneralTabContent, "Buka Touch Fling", CreateTouchFlingGUI)
+        createButton(GeneralTabContent, "Buka Touch Fling", function() if checkPermission() then CreateTouchFlingGUI() end end)
         createToggle(GeneralTabContent, "Anti-Fling", antifling_enabled, ToggleAntiFling)
-        createButton(GeneralTabContent, "Buka GUI Magnet", createMagnetGUI)
-        createButton(GeneralTabContent, "Buka GUI Part Controller", createPartControllerGUI)
+        createButton(GeneralTabContent, "Buka GUI Magnet", function() if checkPermission() then createMagnetGUI() end end)
+        createButton(GeneralTabContent, "Buka GUI Part Controller", function() if checkPermission() then createPartControllerGUI() end end)
     end
     
     setupTeleportTab = function()
@@ -6336,9 +6353,10 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     -- ====================================================================
     -- == LOGIKA EKSEKUSI UTAMA                                        ==
     -- ====================================================================
-    local savedExpiration = loadSession()
-    if savedExpiration then
-        InitializeMainGUI(savedExpiration)
+    local sessionData = loadSession()
+    if sessionData then
+        currentUserRole = sessionData.role or "Normal"
+        InitializeMainGUI(sessionData.expiration)
     else
         -- Gagal memuat sesi, perlu login manual
         local success, passwordData = pcall(function()
