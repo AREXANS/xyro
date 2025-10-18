@@ -717,141 +717,207 @@ task.spawn(function()
         end
     end
 
+    -- Moved all these declarations to the higher scope to fix "out of local registers" error
+    local Players, UserInputService, RunService, Workspace, LocalPlayer, TweenService, Lighting, MaterialService, TeleportService
+    local Settings, IsFlying, IsNoclipEnabled, IsGodModeEnabled, IsWalkSpeedEnabled, OriginalWalkSpeed, FlyConnections, godModeConnection, IsInfinityJumpEnabled, infinityJumpConnection, PlayerButtons, CurrentPlayerFilter, touchFlingGui, isUpdatingPlayerList, isMiniToggleDraggable, IsAntiLagEnabled, antiLagConnection, IsShiftLockEnabled, shiftLockConnection
+    local IsFEInvisibleEnabled, feInvisSeat, IsEspNameEnabled, IsEspBodyEnabled, EspRenderConnection, espCache, IsBoostFPSEnabled, boostFpsOriginalSettings, boostFpsDescendantConnection
+    local IsViewingPlayer, viewingPlayerConnection, currentlyViewedPlayer, SpectatorGui, originalPlayerCFrame, originalCameraSubject
+    local isSpectatingLocation, spectateLocationGui, originalCameraProperties, spectateCameraConnections, areTeleportIconsVisible, isAutoLooping
+    local isEmoteToggleDraggable, isAnimationToggleDraggable, isEmoteTransparent, isAnimationTransparent
+    local isMagnetActive, magnetPower, magnetRange, magnetConnection, scannedParts, partGoals, scanCenterPosition, magnetMode, MagnetGUI
+    local PartControllerGUI, pc_config, pc_state, PC_MODES
+    local savedTeleportLocations, loadedGuiPositions, originalCharacterAppearance
+    local antifling_velocity_threshold, antifling_angular_threshold, antifling_last_safe_cframe, antifling_enabled, antifling_connection
+    local currentFlingTarget, flingLoopConnection, flingStartPosition, flingStatusGui
+    local isRecording, isPlaying, recordingConnection, playbackConnection, savedRecordings, currentRecordingData, loadedRecordingName, currentRecordingTarget
+    local isCopyingMovement, copiedPlayer, copyMovementConnection, copyAnimationCache, copyMovementMovers
+    local isEmoteEnabled, EmoteScreenGui, isAnimationEnabled, AnimationScreenGui, lastAnimations
+    local ScreenGui, MiniToggleContainer, MiniToggleButton, EmoteToggleButton, AnimationShowButton, MainFrame, TitleBar, ExpirationLabel, TabsFrame, ContentFrame
+    local PlayerTabContent, PlayerListContainer, GeneralTabContent, TeleportTabContent, VipTabContent, SettingsTabContent, RekamanTabContent
+    local PlayerListLayout, GeneralListLayout, TeleportListLayout, VipListLayout, SettingsListLayout, RekamanListLayout
+    local setupPlayerTab, setupGeneralTab, setupTeleportTab, setupVipTab, setupSettingsTab, setupRekamanTab
+
     local function InitializeMainGUI(expirationTimestamp)
         -- Layanan dan Variabel Global
-        local Players = game:GetService("Players")
-        local UserInputService = game:GetService("UserInputService")
-        local RunService = game:GetService("RunService")
-        local Workspace = game:GetService("Workspace")
-        local LocalPlayer = Players.LocalPlayer
-    local TweenService = game:GetService("TweenService")
-    local Lighting = game:GetService("Lighting")
-    local MaterialService = game:GetService("MaterialService")
-    local TeleportService = game:GetService("TeleportService")
+        Players = game:GetService("Players")
+        UserInputService = game:GetService("UserInputService")
+        RunService = game:GetService("RunService")
+        Workspace = game:GetService("Workspace")
+        LocalPlayer = Players.LocalPlayer
+        TweenService = game:GetService("TweenService")
+        Lighting = game:GetService("Lighting")
+        MaterialService = game:GetService("MaterialService")
+        TeleportService = game:GetService("TeleportService")
     
-    -- Pengaturan Default
-    local Settings = {
-        FlySpeed = 1,
-        WalkSpeed = 16,
-        MaxFlySpeed = 10,
-        MaxWalkSpeed = 500,
-        TeleportDistance = 100,
-        FEInvisibleTransparency = 0.75,
-    }
+        -- Pengaturan Default
+        Settings = {
+            FlySpeed = 1,
+            WalkSpeed = 16,
+            MaxFlySpeed = 10,
+            MaxWalkSpeed = 500,
+            TeleportDistance = 100,
+            FEInvisibleTransparency = 0.75,
+        }
     
-    -- Variabel Status
-    local IsFlying = false
-    local IsNoclipEnabled = false
-    local IsGodModeEnabled = false 
-    local IsWalkSpeedEnabled = false
-    local OriginalWalkSpeed = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") and LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed or 16
-    local FlyConnections = {}
-    local godModeConnection = nil 
-    local IsInfinityJumpEnabled = false
-    local infinityJumpConnection = nil
-    local PlayerButtons = {} -- Cache untuk elemen UI pemain
-    local CurrentPlayerFilter = ""
-    local touchFlingGui = nil
-    local isUpdatingPlayerList = false 
-    local isMiniToggleDraggable = true 
-    local IsAntiLagEnabled = false 
-    local antiLagConnection = nil 
-    local IsShiftLockEnabled = false
-    local shiftLockConnection = nil
+        -- Variabel Status
+        IsFlying = false
+        IsNoclipEnabled = false
+        IsGodModeEnabled = false 
+        IsWalkSpeedEnabled = false
+        OriginalWalkSpeed = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") and LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed or 16
+        FlyConnections = {}
+        godModeConnection = nil 
+        IsInfinityJumpEnabled = false
+        infinityJumpConnection = nil
+        PlayerButtons = {} -- Cache untuk elemen UI pemain
+        CurrentPlayerFilter = ""
+        touchFlingGui = nil
+        isUpdatingPlayerList = false 
+        isMiniToggleDraggable = true 
+        IsAntiLagEnabled = false 
+        antiLagConnection = nil 
+        IsShiftLockEnabled = false
+        shiftLockConnection = nil
     
-    -- [[ FE INVISIBLE INTEGRATION ]]
-    local IsFEInvisibleEnabled = false
-    local feInvisSeat = nil
-    -- [[ END FE INVISIBLE INTEGRATION ]]
+        -- [[ FE INVISIBLE INTEGRATION ]]
+        IsFEInvisibleEnabled = false
+        feInvisSeat = nil
+        -- [[ END FE INVISIBLE INTEGRATION ]]
 
-    -- [[ PERUBAHAN DIMULAI: Variabel ESP dipisahkan ]]
-    local IsEspNameEnabled = false
-    local IsEspBodyEnabled = false
-    -- [[ PERUBAHAN SELESAI ]]
-    local EspRenderConnection = nil
-    local espCache = {} -- Cache untuk elemen GUI ESP agar tidak dibuat ulang terus-menerus
+        -- [[ PERUBAHAN DIMULAI: Variabel ESP dipisahkan ]]
+        IsEspNameEnabled = false
+        IsEspBodyEnabled = false
+        -- [[ PERUBAHAN SELESAI ]]
+        EspRenderConnection = nil
+        espCache = {} -- Cache untuk elemen GUI ESP agar tidak dibuat ulang terus-menerus
     
-    -- [[ INTEGRASI BOOST FPS ]] --
-    local IsBoostFPSEnabled = false
-    local boostFpsOriginalSettings = {}
-    local boostFpsDescendantConnection = nil
+        -- [[ INTEGRASI BOOST FPS ]] --
+        IsBoostFPSEnabled = false
+        boostFpsOriginalSettings = {}
+        boostFpsDescendantConnection = nil
     
-    -- [[ VARIABEL VIEW PLAYER ]] --
-    local IsViewingPlayer = false
-    local viewingPlayerConnection = nil
-    local currentlyViewedPlayer = nil
-    local SpectatorGui = nil
-    local originalPlayerCFrame = nil -- Untuk menyimpan CFrame asli pemain
-    local originalCameraSubject = nil -- Untuk menyimpan subjek kamera asli
+        -- [[ VARIABEL VIEW PLAYER ]] --
+        IsViewingPlayer = false
+        viewingPlayerConnection = nil
+        currentlyViewedPlayer = nil
+        SpectatorGui = nil
+        originalPlayerCFrame = nil -- Untuk menyimpan CFrame asli pemain
+        originalCameraSubject = nil -- Untuk menyimpan subjek kamera asli
     
-    -- [[ PERUBAHAN BARU: Variabel untuk Spectate Lokasi ]]
-    local isSpectatingLocation = false
-    local spectateLocationGui = nil
-    local originalCameraProperties = {}
-    local spectateCameraConnections = {}
-    local areTeleportIconsVisible = true
-    local isAutoLooping = false
+        -- [[ PERUBAHAN BARU: Variabel untuk Spectate Lokasi ]]
+        isSpectatingLocation = false
+        spectateLocationGui = nil
+        originalCameraProperties = {}
+        spectateCameraConnections = {}
+        areTeleportIconsVisible = true
+        isAutoLooping = false
     
-    local isEmoteToggleDraggable = true
-    local isAnimationToggleDraggable = true
+        isEmoteToggleDraggable = true
+        isAnimationToggleDraggable = true
 
-    local isEmoteTransparent = true
-    local isAnimationTransparent = true
+        isEmoteTransparent = true
+        isAnimationTransparent = true
 
-    -- Variabel Teleport
-    local savedTeleportLocations = {}
-    
-    -- Variabel untuk menyimpan posisi GUI
-    local loadedGuiPositions = nil
-    
-    -- Variabel untuk menyimpan status fitur
-    
-    -- Variabel untuk menyimpan data original karakter saat invisible
-    local originalCharacterAppearance = {}
+        -- [[ AWAL INTEGRASI MAGNET.LUA ]]
+        isMagnetActive = false
+        magnetPower = 999
+        magnetRange = 150
+        magnetConnection = nil
+        scannedParts = {}
+        partGoals = {}
+        scanCenterPosition = Vector3.zero
+        magnetMode = "target_player" -- "target_player" atau "random_free"
+        MagnetGUI = nil
+        -- [[ AKHIR INTEGRASI MAGNET.LUA ]]
 
-    -- Variabel AntiFling
-    local antifling_velocity_threshold = 85
-    local antifling_angular_threshold = 25
-    local antifling_last_safe_cframe = nil
-    local antifling_enabled = false
-    local antifling_connection = nil
-    
-    -- [[ VARIABEL UNTUK FITUR FLING ]] --
-    local currentFlingTarget = nil
-    local flingLoopConnection = nil
-    local flingStartPosition = nil 
-    local flingStatusGui = nil 
+        -- [[ AWAL INTEGRASI PARTCONTROLLER.LUA ]]
+        PartControllerGUI = nil
+        pc_config = {
+            partLimit = 100,
+            radius = 150,
+            magnetForce = 1000000,
+            speed = 5,
+            launchSpeed = 100,
+            updateRate = 0.03,
+            batchSize = 10
+        }
+        pc_state = {
+            mode = "bring",
+            active = false,
+            parts = {},
+            originalProperties = {},
+            removedItems = {},
+            timeOffset = 0,
+            connection = nil,
+            bodyPositions = {},
+            currentModeIndex = 1
+        }
+        PC_MODES = {
+            {n="Bring",v="bring"}, {n="Ring",v="ring"}, {n="Tornado",v="tornado"},
+            {n="Blackhole",v="blackhole"}, {n="Orbit",v="orbit"}, {n="Spiral",v="spiral"},
+            {n="Wave",v="wave"}, {n="Fountain",v="fountain"}, {n="Shield",v="shield"},
+            {n="Sphere",v="sphere"}, {n="Launch",v="launch"}, {n="Explosion",v="explosion"},
+            {n="Galaxy",v="galaxy"}, {n="DNA",v="dna"}, {n="Supernova",v="supernova"},
+            {n="Matrix",v="matrix"}, {n="Vortex",v="vortex"}, {n="Meteor",v="meteor"},
+            {n="Portal",v="portal"}, {n="Dragon",v="dragon"}, {n="Infinity",v="infinity"},
+            {n="Tsunami",v="tsunami"}, {n="Solar",v="solar"}, {n="Quantum",v="quantum"}
+        }
+        -- [[ AKHIR INTEGRASI PARTCONTROLLER.LUA ]]
 
-    -- [[ VARIABEL UNTUK FITUR REKAMAN ]] --
-    local isRecording = false
-    local isPlaying = false
-    local recordingConnection = nil
-    local playbackConnection = nil
-    local savedRecordings = {}
-    local currentRecordingData = {}
-    local loadedRecordingName = nil
-    local currentRecordingTarget = nil -- [[ PERUBAHAN BARU ]]
-
-    -- [[ VARIABEL UNTUK FITUR COPY MOVEMENT ]] --
-    local isCopyingMovement = false
-    local copiedPlayer = nil
-    local copyMovementConnection = nil
-    local copyAnimationCache = {}
-    local copyMovementMovers = {}
+        -- Variabel Teleport
+        savedTeleportLocations = {}
     
-    -- ====================================================================
-    -- == VARIABEL UNTUK FITUR EMOTE DAN ANIMASI (DIPISAHKAN)          ==
-    -- ====================================================================
-    local isEmoteEnabled = false
-    local EmoteScreenGui = nil
-    local isAnimationEnabled = false 
-    local AnimationScreenGui = nil 
+        -- Variabel untuk menyimpan posisi GUI
+        loadedGuiPositions = nil
     
-    -- Variabel Global untuk menyimpan animasi
-    local lastAnimations = {}
+        -- Variabel untuk menyimpan status fitur
+    
+        -- Variabel untuk menyimpan data original karakter saat invisible
+        originalCharacterAppearance = {}
 
-    -- Membuat GUI utama
-    local ScreenGui = Instance.new("ScreenGui")
+        -- Variabel AntiFling
+        antifling_velocity_threshold = 85
+        antifling_angular_threshold = 25
+        antifling_last_safe_cframe = nil
+        antifling_enabled = false
+        antifling_connection = nil
+    
+        -- [[ VARIABEL UNTUK FITUR FLING ]] --
+        currentFlingTarget = nil
+        flingLoopConnection = nil
+        flingStartPosition = nil 
+        flingStatusGui = nil 
+
+        -- [[ VARIABEL UNTUK FITUR REKAMAN ]] --
+        isRecording = false
+        isPlaying = false
+        recordingConnection = nil
+        playbackConnection = nil
+        savedRecordings = {}
+        currentRecordingData = {}
+        loadedRecordingName = nil
+        currentRecordingTarget = nil -- [[ PERUBAHAN BARU ]]
+
+        -- [[ VARIABEL UNTUK FITUR COPY MOVEMENT ]] --
+        isCopyingMovement = false
+        copiedPlayer = nil
+        copyMovementConnection = nil
+        copyAnimationCache = {}
+        copyMovementMovers = {}
+    
+        -- ====================================================================
+        -- == VARIABEL UNTUK FITUR EMOTE DAN ANIMASI (DIPISAHKAN)          ==
+        -- ====================================================================
+        isEmoteEnabled = false
+        EmoteScreenGui = nil
+        isAnimationEnabled = false 
+        AnimationScreenGui = nil 
+    
+        -- Variabel Global untuk menyimpan animasi
+        lastAnimations = {}
+
+        -- Membuat GUI utama
+        ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "ArexanstoolsGUI"
     ScreenGui.Parent = CoreGui
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -3106,6 +3172,545 @@ task.spawn(function()
         antifling_enabled = enabled; saveFeatureStates(); if enabled and not antifling_connection then antifling_connection = RunService.Heartbeat:Connect(protect_character) elseif not enabled and antifling_connection then antifling_connection:Disconnect(); antifling_connection = nil end
     end
 
+    -- [[ AWAL INTEGRASI FUNGSI MAGNET.LUA ]]
+    local stopMagnet, playMagnet, scanForParts, createMagnetGUI
+
+    stopMagnet = function()
+        if not isMagnetActive then return end
+        isMagnetActive = false
+        if magnetConnection then magnetConnection:Disconnect(); magnetConnection = nil end
+        
+        task.spawn(function()
+            for _, part in ipairs(scannedParts) do
+                if part and part.Parent and part:IsA("BasePart") then
+                    part.AssemblyLinearVelocity = Vector3.zero
+                    pcall(function() part:SetNetworkOwner(nil) end)
+                end
+            end
+        end)
+    end
+
+    scanForParts = function(rangeBox, statusLabel)
+        local rangeValue = tonumber(rangeBox.Text)
+        if not rangeValue or rangeValue <= 0 then showNotification("Range tidak valid!", Color3.fromRGB(255, 100, 100)); return end
+        
+        stopMagnet()
+        scannedParts = {}
+        partGoals = {}
+        
+        showNotification("Mencari objek...", Color3.fromRGB(220, 220, 220))
+        task.wait(0.1)
+        local character = LocalPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then showNotification("Karakter tidak ditemukan!", Color3.fromRGB(255, 100, 100)); return end
+        
+        scanCenterPosition = character.HumanoidRootPart.Position
+        
+        local partsInWorkspace = Workspace:GetPartBoundsInRadius(scanCenterPosition, rangeValue)
+        for _, part in ipairs(partsInWorkspace) do
+            if part:IsA("BasePart") and not part.Anchored and not character:IsAncestorOf(part) then
+                pcall(function() part:SetNetworkOwner(LocalPlayer) end)
+                table.insert(scannedParts, part)
+            end
+        end
+        local count = #scannedParts
+        showNotification("Scan Selesai: " .. count .. " objek ditemukan.", Color3.fromRGB(100, 255, 100))
+        if statusLabel then
+            statusLabel.Text = "Parts: " .. count
+            statusLabel.TextColor3 = Color3.fromRGB(120, 255, 120)
+        end
+    end
+
+    playMagnet = function(powerBox)
+        if isMagnetActive then return false end
+        local powerValue = tonumber(powerBox.Text)
+        if not powerValue or powerValue <= 0 then showNotification("Power tidak valid!", Color3.fromRGB(255, 100, 100)); return false end
+        magnetPower = powerValue
+        if #scannedParts == 0 then showNotification("Tidak ada objek hasil scan. Scan dulu!", Color3.fromRGB(255, 200, 100)); return false end
+        isMagnetActive = true
+
+        magnetConnection = RunService.Heartbeat:Connect(function(deltaTime)
+            if not isMagnetActive then
+                if magnetConnection then magnetConnection:Disconnect(); magnetConnection = nil end
+                return
+            end
+            local character = LocalPlayer.Character
+            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+            if not rootPart then stopMagnet(); return end
+            
+            local forceMultiplier = magnetPower * 2500 * deltaTime
+
+            for i = #scannedParts, 1, -1 do
+                local part = scannedParts[i]
+                if part and part.Parent then
+                    local targetPosition
+                    
+                    if magnetMode == "random_free" then
+                        local goal = partGoals[part]
+                        local distanceToGoal = goal and (part.Position - goal).Magnitude or 100
+                        
+                        if not goal or distanceToGoal < 15 then
+                            local randomOffset = Vector3.new(math.random(-magnetRange, magnetRange), math.random(5, 50), math.random(-magnetRange, magnetRange))
+                            partGoals[part] = scanCenterPosition + randomOffset
+                        end
+                        targetPosition = partGoals[part]
+                    else -- Mode "target_player"
+                        targetPosition = rootPart.Position
+                    end
+
+                    local direction = (targetPosition - part.Position)
+                    local distance = direction.Magnitude
+                    if distance < 1 then distance = 1 end
+                    
+                    local velocity = direction.Unit * forceMultiplier * (1 / distance)
+                    part.AssemblyLinearVelocity = velocity
+                else
+                    table.remove(scannedParts, i)
+                end
+            end
+        end)
+        return true
+    end
+
+    createMagnetGUI = function()
+        if MagnetGUI and MagnetGUI.Parent then
+            MagnetGUI:Destroy()
+        end
+        MagnetGUI = Instance.new("ScreenGui", CoreGui)
+        MagnetGUI.Name = "MagnetGUI"
+        MagnetGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        MagnetGUI.ResetOnSpawn = false
+
+        local MainFrame = Instance.new("Frame", MagnetGUI)
+        MainFrame.Name = "MainFrame"
+        MainFrame.Size = UDim2.new(0, 180, 0, 95)
+        MainFrame.Position = UDim2.new(0.1, 0, 0.5, -55)
+        MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        MainFrame.BackgroundTransparency = 0.5
+        local MainUICorner = Instance.new("UICorner", MainFrame); MainUICorner.CornerRadius = UDim.new(0, 8)
+        local UIStroke = Instance.new("UIStroke", MainFrame); UIStroke.Color = Color3.fromRGB(0, 150, 255); UIStroke.Thickness = 1.5
+
+        local TitleBar = Instance.new("TextButton", MainFrame)
+        TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 25)
+        TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25); TitleBar.Text = ""
+        local TitleBarCorner = Instance.new("UICorner", TitleBar); TitleBarCorner.CornerRadius = UDim.new(0, 8)
+        TitleBar.AutoButtonColor = false
+        MakeDraggable(MainFrame, TitleBar, function() return true end, nil)
+
+        local TitleLabel = Instance.new("TextLabel", TitleBar)
+        TitleLabel.Size = UDim2.new(0.4, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 8, 0, 0)
+        TitleLabel.BackgroundTransparency = 1; TitleLabel.Text = "Magnet"
+        TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255); TitleLabel.TextSize = 12
+        TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local statusLabel = Instance.new("TextLabel", TitleBar)
+        statusLabel.Size = UDim2.new(0.5, 0, 1, 0); statusLabel.Position = UDim2.new(0.3, 0, 0, 0)
+        statusLabel.BackgroundTransparency = 1; statusLabel.Text = "Parts: " .. #scannedParts
+        statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180); statusLabel.TextSize = 10
+        statusLabel.Font = Enum.Font.SourceSans; statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+        
+        local closeBtn = Instance.new("TextButton",TitleBar)
+        closeBtn.Size = UDim2.new(0,18,0,18); closeBtn.Position = UDim2.new(1,-22,0.5,-9); closeBtn.BackgroundTransparency = 1; closeBtn.Font = Enum.Font.SourceSansBold; closeBtn.Text = "X"; closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); closeBtn.TextSize = 16
+
+        local minimizeBtn = Instance.new("TextButton", TitleBar)
+        minimizeBtn.Size = UDim2.new(0, 18, 0, 18); minimizeBtn.Position = UDim2.new(1, -42, 0.5, -9); minimizeBtn.BackgroundTransparency = 1; minimizeBtn.Font = Enum.Font.SourceSansBold; minimizeBtn.Text = "-"; minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); minimizeBtn.TextSize = 20
+
+        local ContentFrame = Instance.new("Frame", MainFrame)
+        ContentFrame.Name = "ContentFrame"; ContentFrame.ClipsDescendants = true
+        ContentFrame.Size = UDim2.new(1, -10, 1, -30)
+        ContentFrame.Position = UDim2.new(0, 5, 0, 25)
+        ContentFrame.BackgroundTransparency = 1
+        local ContentLayout = Instance.new("UIListLayout", ContentFrame); ContentLayout.Padding = UDim.new(0, 4)
+
+        local function createIconButton(parent, text, size, callback)
+            local btn = Instance.new("TextButton", parent)
+            btn.Size = UDim2.new(0, size, 0, 24); btn.Text = text
+            btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 16
+            btn.TextColor3 = Color3.new(1, 1, 1)
+            local corner = Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 5)
+            if callback then btn.MouseButton1Click:Connect(callback) end
+            return btn
+        end
+        
+        local function createCompactTextBox(parent, name, defaultValue)
+            local frame = Instance.new("Frame", parent)
+            frame.BackgroundTransparency = 1; frame.Size = UDim2.new(0, 55, 0, 24)
+            
+            local label = Instance.new("TextLabel", frame)
+            label.Size = UDim2.new(1, 0, 0, 12); label.BackgroundTransparency = 1; label.Font = Enum.Font.SourceSans
+            label.Text = name; label.TextColor3 = Color3.fromRGB(200, 200, 200); label.TextSize = 10
+            label.TextXAlignment = Enum.TextXAlignment.Center
+            
+            local textBox = Instance.new("TextBox", frame)
+            textBox.Size = UDim2.new(1, 0, 1, -12); textBox.Position = UDim2.new(0, 0, 0, 12)
+            textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35); textBox.TextColor3 = Color3.fromRGB(220, 220, 220)
+            textBox.Text = tostring(defaultValue); textBox.Font = Enum.Font.SourceSans; textBox.TextSize = 11
+            textBox.TextXAlignment = Enum.TextXAlignment.Center
+            local corner = Instance.new("UICorner", textBox); corner.CornerRadius = UDim.new(0, 4)
+            
+            return frame, textBox 
+        end
+
+        local controlsRow = Instance.new("Frame", ContentFrame)
+        controlsRow.BackgroundTransparency = 1; controlsRow.Size = UDim2.new(1, 0, 0, 28)
+
+        local rangeFrame, rangeTextBox = createCompactTextBox(controlsRow, "Range", magnetRange)
+        rangeFrame.Position = UDim2.new(0, 0, 0.5, -12)
+
+        local powerFrame, powerTextBox = createCompactTextBox(controlsRow, "Power", magnetPower)
+        powerFrame.Position = UDim2.new(0, 70, 0.5, -12)
+
+        local scanButton = createIconButton(controlsRow, "📡", 30, function() scanForParts(rangeTextBox, statusLabel) end)
+        scanButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+        scanButton.Position = UDim2.new(0, 140, 0.5, -12) 
+
+        local modeRow = Instance.new("Frame", ContentFrame)
+        modeRow.BackgroundTransparency = 1; modeRow.Size = UDim2.new(1, 0, 0, 28)
+
+        local MODES = { {Name = "Ke Karakter", ID = "target_player"}, {Name = "Acak", ID = "random_free"} }
+        local currentModeIndex = 1
+
+        local prevBtn = createIconButton(modeRow, "<", 25)
+        prevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        prevBtn.Position = UDim2.new(0, 0, 0.5, -12)
+
+        local nextBtn = createIconButton(modeRow, ">", 25)
+        nextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        nextBtn.Position = UDim2.new(0, 95, 0.5, -12)
+
+        local modeLabel = Instance.new("TextLabel", modeRow)
+        modeLabel.Size = UDim2.new(0, 70, 1, 0); 
+        modeLabel.Position = UDim2.new(0, 25, 0, 0)
+        modeLabel.BackgroundTransparency = 1; modeLabel.Font = Enum.Font.SourceSansBold
+        modeLabel.TextSize = 10; modeLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        modeLabel.TextWrapped = true; modeLabel.TextXAlignment = Enum.TextXAlignment.Center
+        
+        local toggleButton = createIconButton(modeRow, "▶️", 30)
+        toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        toggleButton.Position = UDim2.new(1, -30, 0.5, -12)
+        
+        local function updateModeDisplay()
+            local currentModeData = MODES[currentModeIndex]
+            magnetMode = currentModeData.ID
+            modeLabel.Text = currentModeData.Name
+        end
+        
+        prevBtn.MouseButton1Click:Connect(function()
+            currentModeIndex = currentModeIndex - 1
+            if currentModeIndex < 1 then currentModeIndex = #MODES end
+            updateModeDisplay()
+        end)
+        
+        nextBtn.MouseButton1Click:Connect(function()
+            currentModeIndex = currentModeIndex + 1
+            if currentModeIndex > #MODES then currentModeIndex = 1 end
+            updateModeDisplay()
+        end)
+        
+        updateModeDisplay()
+
+        toggleButton.MouseButton1Click:Connect(function()
+            if isMagnetActive then
+                stopMagnet(); toggleButton.Text = "▶️"; toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+            else
+                if playMagnet(powerTextBox) then toggleButton.Text = "⏹️"; toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end
+            end
+        end)
+        
+        closeBtn.MouseButton1Click:Connect(function() if isMagnetActive then stopMagnet() end; MagnetGUI:Destroy() end)
+        
+        local isMinimized = false; 
+        local originalSize = MainFrame.Size
+        local minimizedSize = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, TitleBar.Size.Y.Offset)
+        
+        minimizeBtn.MouseButton1Click:Connect(function()
+            isMinimized = not isMinimized
+            ContentFrame.Visible = not isMinimized
+            local targetSize = isMinimized and minimizedSize or originalSize
+            TweenService:Create(MainFrame, TweenInfo.new(0.2), {Size = targetSize}):Play()
+        end)
+    end
+    -- [[ AKHIR INTEGRASI FUNGSI MAGNET.LUA ]]
+
+    -- [[ AWAL INTEGRASI FUNGSI PARTCONTROLLER.LUA ]]
+    local pc_modes = {}
+    local startPartController, stopPartController, createPartControllerGUI, pc_fullRestore
+
+    local function pc_getPos() return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position end
+    local function pc_getLook() return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.CFrame.LookVector or Vector3.new(0,0,-1) end
+
+    local function pc_cleanBodyPositions()
+        for _, bp in pairs(pc_state.bodyPositions) do
+            if bp and bp.Parent then bp:Destroy() end
+        end
+        pc_state.bodyPositions = {}
+    end
+    
+    local function pc_force(part, targetPos)
+        if not part or not part.Parent then return end
+        pcall(function()
+            part.Anchored = false
+            part.CanCollide = false
+            for _, child in pairs(part:GetChildren()) do if child:IsA("BodyPosition") or child:IsA("BodyVelocity") or child:IsA("BodyGyro") then child:Destroy() end end
+            local bp = Instance.new("BodyPosition")
+            bp.MaxForce = Vector3.new(pc_config.magnetForce, pc_config.magnetForce, pc_config.magnetForce)
+            bp.Position = targetPos; bp.P = 10000; bp.D = 500; bp.Parent = part
+            table.insert(pc_state.bodyPositions, bp)
+        end)
+    end
+
+    pc_modes.bring = function() local p=pc_getPos() if not p then return end for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local o=Vector3.new(math.random(-15,15),math.random(10,30),math.random(-15,15)) pc_force(pt,p+o) end end end
+    pc_modes.ring = function() local p=pc_getPos() if not p then return end local t=tick()*pc_config.speed*0.5 for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local a=((i/#pc_state.parts)*math.pi*2)+t local r=8 local o=Vector3.new(math.cos(a)*r,5,math.sin(a)*r) pc_force(pt,p+o) end end end
+    pc_modes.tornado = function() local p=pc_getPos() if not p then return end local t=tick()*pc_config.speed for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local h=((i-1)%10)*4 local r=5+(h/8) local a=t+(i*0.5) local o=Vector3.new(math.cos(a)*r,h,math.sin(a)*r) pc_force(pt,p+o) end end end
+    pc_modes.blackhole = function() local p=pc_getPos() if not p then return end local c=p+Vector3.new(0,10,0) local t=tick()*pc_config.speed for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local a=(i*0.5)+(t*0.3) local r=3 local o=Vector3.new(math.cos(a)*r,math.sin(t+i*0.2)*2,math.sin(a)*r) pc_force(pt,c+o) end end end
+    pc_modes.orbit = function() local p=pc_getPos() if not p then return end local c=p+Vector3.new(0,8,0) local t=tick()*pc_config.speed*0.3 for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local r=10+((i%3)*3) local a=t+(i*0.8) local o=Vector3.new(math.cos(a)*r,math.sin(a*0.5)*4,math.sin(a)*r) pc_force(pt,c+o) end end end
+    pc_modes.spiral = function() local p=pc_getPos() if not p then return end local t=tick()*pc_config.speed*0.5 for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local h=p.Y+(i*1)+(t%15) local a=(i*0.5)+t local r=8 pc_force(pt,Vector3.new(p.X+math.cos(a)*r,h,p.Z+math.sin(a)*r)) end end end
+    pc_modes.wave = function() local p=pc_getPos() if not p then return end local t=tick()*pc_config.speed for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local h=p.Y+8+math.sin(t+i*0.5)*5 pc_force(pt,Vector3.new(p.X+((i%10)*3)-15,h,p.Z+math.cos(t+i*0.3)*5)) end end end
+    pc_modes.fountain = function() local p=pc_getPos() if not p then return end local t=tick()*pc_config.speed for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local a=(i/#pc_state.parts)*math.pi*2 local h=p.Y+3+math.abs(math.sin(t+i*0.5))*12 local r=4 pc_force(pt,Vector3.new(p.X+math.cos(a)*r,h,p.Z+math.sin(a)*r)) end end end
+    pc_modes.shield = function() local p=pc_getPos() if not p then return end local t=tick()*pc_config.speed for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local a=((i/#pc_state.parts)*math.pi*2)+t local r=8 pc_force(pt,Vector3.new(p.X+math.cos(a)*r,p.Y+2,p.Z+math.sin(a)*r)) end end end
+    pc_modes.sphere = function() local p=pc_getPos() if not p then return end local c=p+Vector3.new(0,10,0) for i,pt in pairs(pc_state.parts) do if pt and pt.Parent then local phi=math.acos(-1+(2*i)/#pc_state.parts) local theta=math.sqrt(#pc_state.parts*math.pi)*phi local r=10 local o=Vector3.new(r*math.cos(theta)*math.sin(phi),r*math.cos(phi),r*math.sin(theta)*math.sin(phi)) pc_force(pt,c+o) end end end
+    pc_modes.launch = function() local p=pc_getPos() if not p then return end local l=pc_getLook() for i=1,math.min(5,#pc_state.parts) do local idx=((pc_state.timeOffset+i-1)%#pc_state.parts)+1 local pt=pc_state.parts[idx] if pt and pt.Parent then pcall(function() pt:BreakJoints() for _,c in pairs(pt:GetChildren()) do if c:IsA("BodyVelocity") then c:Destroy() end end local bv=Instance.new("BodyVelocity") bv.MaxForce=Vector3.new(math.huge,math.huge,math.huge) bv.Velocity=l*pc_config.launchSpeed+Vector3.new(math.random(-10,10),math.random(0,20),math.random(-10,10)) bv.Parent=pt task.delay(2,function() if bv and bv.Parent then bv:Destroy() end end) end) end end end
+    pc_modes.explosion=pc_modes.launch; pc_modes.galaxy=pc_modes.ring; pc_modes.dna=pc_modes.spiral; pc_modes.supernova=pc_modes.blackhole; pc_modes.matrix=pc_modes.bring; pc_modes.vortex=pc_modes.tornado; pc_modes.meteor=pc_modes.launch; pc_modes.portal=pc_modes.ring; pc_modes.dragon=pc_modes.spiral; pc_modes.infinity=pc_modes.wave; pc_modes.tsunami=pc_modes.wave; pc_modes.solar=pc_modes.orbit; pc_modes.quantum=pc_modes.bring
+
+    local pc_temporaryStorage = nil
+
+    local function pc_clearAndStoreConstraints()
+        if not pc_temporaryStorage then showNotification("Penyimpanan sementara tidak ditemukan!", Color3.fromRGB(200,50,50)) return 0 end
+        
+        local storedCount = 0
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("RopeConstraint") or obj:IsA("WeldConstraint") or obj:IsA("Weld") or (obj:IsA("Attachment") and not obj.Parent:FindFirstChildOfClass("Humanoid")) then
+                pcall(function()
+                    local isStored = false
+                    for _, entry in pairs(pc_state.removedItems) do if entry.item == obj then isStored = true break end end
+                    
+                    if not isStored then
+                        table.insert(pc_state.removedItems, {item = obj, parent = obj.Parent})
+                        obj.Parent = pc_temporaryStorage
+                        storedCount = storedCount + 1
+                    end
+                end)
+            end
+        end
+        return storedCount
+    end
+
+    local function pc_scan()
+        pc_state.parts = {}
+        pc_cleanBodyPositions()
+        local p = pc_getPos()
+        if not p then showNotification("Posisi pemain tidak ditemukan", Color3.fromRGB(200,50,50)) return {} end
+        
+        local scanned = 0
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if scanned >= pc_config.partLimit then break end
+            if obj:IsA("BasePart") and not (LocalPlayer.Character and obj:IsDescendantOf(LocalPlayer.Character)) then
+                if (obj.Position - p).Magnitude <= pc_config.radius then
+                    pcall(function()
+                        if not pc_state.originalProperties[obj] then
+                            pc_state.originalProperties[obj] = {Anchored = obj.Anchored, CanCollide = obj.CanCollide}
+                        end
+                        
+                        for _, c in pairs(obj:GetChildren()) do
+                            if c:IsA("Constraint") or c:IsA("Weld") or c:IsA("Attachment") then
+                                local isStored = false
+                                for _, entry in pairs(pc_state.removedItems) do if entry.item == c then isStored = true break end end
+                                if not isStored and pc_temporaryStorage then
+                                    table.insert(pc_state.removedItems, {item = c, parent = c.Parent})
+                                    c.Parent = pc_temporaryStorage
+                                end
+                            end
+                        end
+                        
+                        obj.Anchored = false
+                        obj.CanCollide = false
+                        table.insert(pc_state.parts, obj)
+                        scanned = scanned + 1
+                    end)
+                end
+            end
+        end
+        return pc_state.parts
+    end
+
+    stopPartController = function()
+        if pc_state.connection then pc_state.connection:Disconnect(); pc_state.connection=nil end
+        pc_state.active = false
+        pc_cleanBodyPositions()
+        if PartControllerGUI then
+             local toggleButton = PartControllerGUI:FindFirstChild("toggleButton", true)
+             if toggleButton then
+                toggleButton.Text = "▶️"
+                toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+             end
+        end
+    end
+
+    startPartController = function()
+        if pc_state.active then return end
+        if #pc_state.parts == 0 then pc_scan() end
+        if #pc_state.parts == 0 then showNotification("Tidak bisa mulai - tidak ada part!", Color3.fromRGB(200,50,50)); return end
+        
+        pc_state.active = true
+        pc_state.timeOffset = 0
+        pc_state.connection = RunService.Heartbeat:Connect(function()
+            if not pc_state.active then return end
+            pc_state.timeOffset = (pc_state.timeOffset + pc_config.batchSize) % #pc_state.parts
+            local fn = pc_modes[pc_state.mode]
+            if fn then pcall(fn) end
+        end)
+        if PartControllerGUI then
+             local toggleButton = PartControllerGUI:FindFirstChild("toggleButton", true)
+             if toggleButton then
+                toggleButton.Text = "⏹️"
+                toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+             end
+        end
+    end
+
+    pc_fullRestore = function()
+        stopPartController()
+
+        for _, entry in pairs(pc_state.removedItems) do
+            if entry.item and entry.parent and entry.parent.Parent then
+                pcall(function() entry.item.Parent = entry.parent end)
+            end
+        end
+
+        for part, properties in pairs(pc_state.originalProperties) do
+            if part and part.Parent then
+                pcall(function()
+                    part.Anchored = properties.Anchored
+                    part.CanCollide = properties.CanCollide
+                end)
+            end
+        end
+
+        pc_state.parts = {}
+        pc_state.originalProperties = {}
+        pc_state.removedItems = {}
+        if PartControllerGUI then
+            local statusLabel = PartControllerGUI:FindFirstChild("statusLabel", true)
+            if statusLabel then statusLabel.Text = "Parts: 0" end
+        end
+    end
+
+    createPartControllerGUI = function()
+        if PartControllerGUI and PartControllerGUI.Parent then PartControllerGUI:Destroy() end
+        PartControllerGUI = Instance.new("ScreenGui", CoreGui); PartControllerGUI.Name = "ArexansPartControllerGUI"; PartControllerGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; PartControllerGUI.ResetOnSpawn = false
+        
+        pc_temporaryStorage = Instance.new("Folder", PartControllerGUI); pc_temporaryStorage.Name = "TemporaryStorage"
+
+        local MainFrame = Instance.new("Frame", PartControllerGUI)
+        MainFrame.Name = "MainFrame"
+        MainFrame.Size = UDim2.new(0, 180, 0, 95)
+        MainFrame.Position = UDim2.new(0.5, -90, 0.5, -47)
+        MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+        MainFrame.BackgroundTransparency = 0.5
+        local MainUICorner = Instance.new("UICorner", MainFrame); MainUICorner.CornerRadius = UDim.new(0, 8)
+        local UIStroke = Instance.new("UIStroke", MainFrame); UIStroke.Color = Color3.fromRGB(0, 150, 255); UIStroke.Thickness = 1.5
+
+        local TitleBar = Instance.new("TextButton", MainFrame)
+        TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 25)
+        TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25); TitleBar.Text = ""
+        local TitleBarCorner = Instance.new("UICorner", TitleBar); TitleBarCorner.CornerRadius = UDim.new(0, 8)
+        TitleBar.AutoButtonColor = false
+        MakeDraggable(MainFrame, TitleBar, function() return true end, nil)
+
+        local TitleLabel = Instance.new("TextLabel", TitleBar)
+        TitleLabel.Size = UDim2.new(0.4, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 8, 0, 0)
+        TitleLabel.BackgroundTransparency = 1; TitleLabel.Text = "P-Controller"
+        TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255); TitleLabel.TextSize = 12
+        TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        local statusLabel = Instance.new("TextLabel", TitleBar)
+        statusLabel.Name = "statusLabel"
+        statusLabel.Size = UDim2.new(0.5, 0, 1, 0); statusLabel.Position = UDim2.new(0.3, 0, 0, 0)
+        statusLabel.BackgroundTransparency = 1; statusLabel.Text = "Parts: " .. #pc_state.parts
+        statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180); statusLabel.TextSize = 10
+        statusLabel.Font = Enum.Font.SourceSans; statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+        
+        local closeBtn = Instance.new("TextButton",TitleBar)
+        closeBtn.Size = UDim2.new(0,18,0,18); closeBtn.Position = UDim2.new(1,-22,0.5,-9); closeBtn.BackgroundTransparency = 1; closeBtn.Font = Enum.Font.SourceSansBold; closeBtn.Text = "X"; closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); closeBtn.TextSize = 16
+
+        local minimizeBtn = Instance.new("TextButton", TitleBar)
+        minimizeBtn.Size = UDim2.new(0, 18, 0, 18); minimizeBtn.Position = UDim2.new(1, -42, 0.5, -9); minimizeBtn.BackgroundTransparency = 1; minimizeBtn.Font = Enum.Font.SourceSansBold; minimizeBtn.Text = "-"; minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); minimizeBtn.TextSize = 20
+
+        local ContentFrame = Instance.new("Frame", MainFrame)
+        ContentFrame.Name = "ContentFrame"; ContentFrame.ClipsDescendants = true
+        ContentFrame.Size = UDim2.new(1, -10, 1, -30)
+        ContentFrame.Position = UDim2.new(0, 5, 0, 25)
+        ContentFrame.BackgroundTransparency = 1
+        local ContentLayout = Instance.new("UIListLayout", ContentFrame); ContentLayout.Padding = UDim.new(0, 4)
+
+        local function createIconButton(parent, text, size, callback)
+            local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(0, size, 0, 24); btn.Text = text
+            btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 16; btn.TextColor3 = Color3.new(1, 1, 1)
+            local corner = Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 5)
+            if callback then btn.MouseButton1Click:Connect(callback) end
+            return btn
+        end
+        
+        local function createCompactTextBox(parent, name, defaultValue, callback)
+            local frame = Instance.new("Frame", parent); frame.BackgroundTransparency = 1; frame.Size = UDim2.new(0, 48, 0, 24)
+            local label = Instance.new("TextLabel", frame); label.Size = UDim2.new(1, 0, 0, 12); label.BackgroundTransparency = 1; label.Font = Enum.Font.SourceSans
+            label.Text = name; label.TextColor3 = Color3.fromRGB(200, 200, 200); label.TextSize = 10; label.TextXAlignment = Enum.TextXAlignment.Center
+            local textBox = Instance.new("TextBox", frame); textBox.Size = UDim2.new(1, 0, 1, -12); textBox.Position = UDim2.new(0, 0, 0, 12)
+            textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35); textBox.TextColor3 = Color3.fromRGB(220, 220, 220); textBox.Text = tostring(defaultValue); textBox.Font = Enum.Font.SourceSans; textBox.TextSize = 11
+            textBox.TextXAlignment = Enum.TextXAlignment.Center; textBox.ClearTextOnFocus = false
+            local corner = Instance.new("UICorner", textBox); corner.CornerRadius = UDim.new(0, 4)
+            textBox.FocusLost:Connect(function(enterPressed) local num = tonumber(textBox.Text) if num and callback then callback(num) else textBox.Text = tostring(defaultValue) end end)
+            return frame, textBox 
+        end
+
+        local controlsRow = Instance.new("Frame", ContentFrame)
+        controlsRow.BackgroundTransparency = 1; controlsRow.Size = UDim2.new(1, 0, 0, 28)
+        local radiusFrame, radiusBox = createCompactTextBox(controlsRow, "Radius", pc_config.radius, function(v) pc_config.radius = v end); radiusFrame.Position = UDim2.new(0, 0, 0.5, -12)
+        local speedFrame, speedBox = createCompactTextBox(controlsRow, "Speed", pc_config.speed, function(v) pc_config.speed = v; pc_config.launchSpeed = v * 20 end); speedFrame.Position = UDim2.new(0, 52, 0.5, -12)
+        
+        local destroyBtn = createIconButton(controlsRow, "🚯", 30, function()
+            destroyBtn.Text = "..."
+            task.spawn(function()
+                local n = pc_clearAndStoreConstraints(); destroyBtn.Text = "🚯"; statusLabel.Text = "Stored "..n; statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                task.wait(2); statusLabel.Text = "Parts: "..#pc_state.parts; statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+            end)
+        end)
+        destroyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40); destroyBtn.Position = UDim2.new(0, 104, 0.5, -12) 
+        
+        local isScanning = false
+        local scanButton = createIconButton(controlsRow, "🔍", 30, function()
+            if isScanning then return end; isScanning = true; statusLabel.Text = "Scanning..."; statusLabel.TextColor3 = Color3.fromRGB(255, 180, 80)
+            task.spawn(function()
+                task.wait(); local foundParts = pc_scan(); statusLabel.Text = "Parts: " .. #foundParts; statusLabel.TextColor3 = Color3.fromRGB(120, 255, 120); isScanning = false
+            end)
+        end)
+        scanButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255); scanButton.Position = UDim2.new(0, 138, 0.5, -12)
+
+        local modeRow = Instance.new("Frame", ContentFrame); modeRow.BackgroundTransparency = 1; modeRow.Size = UDim2.new(1, 0, 0, 28)
+        local prevBtn = createIconButton(modeRow, "<", 25); prevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); prevBtn.Position = UDim2.new(0, 0, 0.5, -12)
+        local modeLabel = Instance.new("TextLabel", modeRow); modeLabel.Size = UDim2.new(0, 70, 1, 0); modeLabel.Position = UDim2.new(0, 29, 0, 0)
+        modeLabel.BackgroundTransparency = 1; modeLabel.Font = Enum.Font.SourceSansBold; modeLabel.TextSize = 10; modeLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+        modeLabel.TextWrapped = true; modeLabel.TextXAlignment = Enum.TextXAlignment.Center
+        local nextBtn = createIconButton(modeRow, ">", 25); nextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); nextBtn.Position = UDim2.new(0, 103, 0.5, -12)
+        local toggleButton = createIconButton(modeRow, "▶️", 30); toggleButton.Position = UDim2.new(0, 138, 0.5, -12); toggleButton.Name = "toggleButton"
+        
+        local function updateModeDisplay() local currentModeData = PC_MODES[pc_state.currentModeIndex]; pc_state.mode = currentModeData.v; modeLabel.Text = currentModeData.n end
+        prevBtn.MouseButton1Click:Connect(function() pc_state.currentModeIndex = pc_state.currentModeIndex - 1; if pc_state.currentModeIndex < 1 then pc_state.currentModeIndex = #PC_MODES end; updateModeDisplay() end)
+        nextBtn.MouseButton1Click:Connect(function() pc_state.currentModeIndex = pc_state.currentModeIndex + 1; if pc_state.currentModeIndex > #PC_MODES then pc_state.currentModeIndex = 1 end; updateModeDisplay() end)
+        updateModeDisplay()
+
+        toggleButton.MouseButton1Click:Connect(function() if pc_state.active then stopPartController() else startPartController() end end)
+        if pc_state.active then toggleButton.Text = "⏹️"; toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) else toggleButton.Text = "▶️"; toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100) end
+        
+        closeBtn.MouseButton1Click:Connect(function() pc_fullRestore(); PartControllerGUI:Destroy() end)
+        
+        local isMinimized = false; local originalSize = MainFrame.Size; local minimizedSize = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, TitleBar.Size.Y.Offset)
+        minimizeBtn.MouseButton1Click:Connect(function()
+            isMinimized = not isMinimized; ContentFrame.Visible = not isMinimized; local targetSize = isMinimized and minimizedSize or originalSize
+            TweenService:Create(MainFrame, TweenInfo.new(0.2), {Size = targetSize}):Play()
+        end)
+    end
+    -- [[ AKHIR INTEGRASI FUNGSI PARTCONTROLLER.LUA ]]
+
     local function ToggleAntiLag(enabled)
         IsAntiLagEnabled = enabled
         saveFeatureStates()
@@ -3890,10 +4495,6 @@ task.spawn(function()
         if IsEspBodyEnabled then ToggleESPBody(false) end
         if IsShiftLockEnabled then ToggleShiftLock(false) end
         -- [[ PERUBAHAN SELESAI ]]
-
-        -- Call cleanup functions for merged scripts
-        if _G.stopMagnet then pcall(_G.stopMagnet) end
-        if _G.fullRestore_PartController then pcall(_G.fullRestore_PartController) end
     end
 
     local function CloseScript()
@@ -4158,8 +4759,8 @@ task.spawn(function()
         end)
         createButton(GeneralTabContent, "Buka Touch Fling", CreateTouchFlingGUI)
         createToggle(GeneralTabContent, "Anti-Fling", antifling_enabled, ToggleAntiFling)
-        createButton(GeneralTabContent, "Buka Gui Magnet", InitializeMagnetGUI)
-        createButton(GeneralTabContent, "Gui Part Controller", InitializePartControllerGUI)
+        createButton(GeneralTabContent, "Buka GUI Magnet", createMagnetGUI)
+        createButton(GeneralTabContent, "Buka GUI Part Controller", createPartControllerGUI)
     end
 
     local function setupVipTab()
@@ -4194,7 +4795,7 @@ task.spawn(function()
         end).LayoutOrder = 4
     end
 
-    local function setupSettingsTab()
+    setupSettingsTab = function()
         createToggle(SettingsTabContent, "Kunci Bar Tombol", not isMiniToggleDraggable, function(v) isMiniToggleDraggable = not v end).LayoutOrder = 1
         createSlider(SettingsTabContent, "Ukuran Tombol Navigasi", 10, 50, 30, "px", 1, function(v)
             if MiniToggleButton then
@@ -4214,9 +4815,7 @@ task.spawn(function()
         logoutButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 
-
-    do
-        local function setupPlayerTab()
+    setupPlayerTab = function()
         local playerHeaderFrame = Instance.new("Frame", PlayerTabContent); playerHeaderFrame.Size = UDim2.new(1, 0, 0, 55); playerHeaderFrame.BackgroundTransparency = 1
         local playerCountLabel = Instance.new("TextLabel", playerHeaderFrame); playerCountLabel.Name = "PlayerCountLabel"; playerCountLabel.Size = UDim2.new(1, -20, 0, 15); playerCountLabel.BackgroundTransparency = 1; playerCountLabel.Text = "Pemain Online: " .. #Players:GetPlayers(); playerCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255); playerCountLabel.TextSize = 12; playerCountLabel.TextXAlignment = Enum.TextXAlignment.Left; playerCountLabel.Font = Enum.Font.SourceSansBold
         
@@ -4395,193 +4994,163 @@ task.spawn(function()
             end
         end)
     end
-        setupPlayerTab()
-    end
-    do
-        local function setupGeneralTab()
-            createToggle(GeneralTabContent, "ESP Nama", IsEspNameEnabled, ToggleESPName)
-            createToggle(GeneralTabContent, "ESP Tubuh", IsEspBodyEnabled, ToggleESPBody)
-            createSlider(GeneralTabContent, "Kecepatan Jalan", 0, Settings.MaxWalkSpeed, Settings.WalkSpeed, "", 1, function(v) Settings.WalkSpeed = v; if IsWalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character.Humanoid then LocalPlayer.Character.Humanoid.WalkSpeed = v end end)
-            createToggle(GeneralTabContent, "Jalan Cepat", IsWalkSpeedEnabled, function(v) IsWalkSpeedEnabled = v; ToggleWalkSpeed(v) end)
-            createSlider(GeneralTabContent, "Kecepatan Terbang", 0, Settings.MaxFlySpeed, Settings.FlySpeed, "", 0.1, function(v) Settings.FlySpeed = v end)
-            createToggle(GeneralTabContent, "Terbang", IsFlying, function(v) if v then if UserInputService.TouchEnabled then StartMobileFly() else StartFly() end else if UserInputService.TouchEnabled then StopMobileFly() else StopFly() end end end)
-            createToggle(GeneralTabContent, "Noclip", IsNoclipEnabled, function(v) ToggleNoclip(v) end)
-            createToggle(GeneralTabContent, "Infinity Jump", IsInfinityJumpEnabled, function(v) IsInfinityJumpEnabled = v; saveFeatureStates(); if v then if LocalPlayer.Character and LocalPlayer.Character.Humanoid then infinityJumpConnection = ConnectEvent(UserInputService.JumpRequest, function() LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) end elseif infinityJumpConnection then infinityJumpConnection:Disconnect(); infinityJumpConnection = nil end end)
-            createToggle(GeneralTabContent, "Mode Kebal", IsGodModeEnabled, ToggleGodMode)
-            createToggle(GeneralTabContent, "FE Invisible", IsFEInvisibleEnabled, ToggleFEInvisible)
-            createSlider(GeneralTabContent, "Transparansi Invisible", 0, 100, Settings.FEInvisibleTransparency * 100, "%", 1, function(v)
-                Settings.FEInvisibleTransparency = v / 100
-                if IsFEInvisibleEnabled and LocalPlayer.Character then
-                    setCharacterTransparency(LocalPlayer.Character, Settings.FEInvisibleTransparency)
-                end
-                saveFeatureStates() -- Simpan perubahan transparansi
-            end)
-            createButton(GeneralTabContent, "Buka Touch Fling", CreateTouchFlingGUI)
-            createToggle(GeneralTabContent, "Anti-Fling", antifling_enabled, ToggleAntiFling)
-            createButton(GeneralTabContent, "Buka Gui Magnet", InitializeMagnetGUI)
-            createButton(GeneralTabContent, "Gui Part Controller", InitializePartControllerGUI)
-        end
-        setupGeneralTab()
-    end
-    do
-        local function setupTeleportTab()
-            createButton(TeleportTabContent, "Pindai Ulang Map", function() for _, part in pairs(Workspace:GetDescendants()) do if part:IsA("BasePart") then local nameLower = part.Name:lower(); if (nameLower:find("checkpoint") or nameLower:find("pos") or nameLower:find("finish") or nameLower:find("start")) and not Players:GetPlayerFromCharacter(part.Parent) then addTeleportLocation(part.Name, part.CFrame) end end end end).LayoutOrder = 1
-            createButton(TeleportTabContent, "Simpan Lokasi Saat Ini", function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then local newName = "Kustom " .. (#savedTeleportLocations + 1); addTeleportLocation(newName, LocalPlayer.Character.HumanoidRootPart.CFrame) end end).LayoutOrder = 2
-            
-            local importExportFrame = Instance.new("Frame", TeleportTabContent)
-            importExportFrame.Size = UDim2.new(1, 0, 0, 25)
-            importExportFrame.BackgroundTransparency = 1
-            importExportFrame.LayoutOrder = 3
-            local ieLayout = Instance.new("UIListLayout", importExportFrame)
-            ieLayout.FillDirection = Enum.FillDirection.Horizontal
-            ieLayout.Padding = UDim.new(0, 5)
-            
-            local exportButton = createButton(importExportFrame, "Ekspor", function() 
-                if not setclipboard then showNotification("Executor tidak mendukung clipboard!", Color3.fromRGB(200, 50, 50)); return end
-                local dataToExport = {}; for _, loc in ipairs(savedTeleportLocations) do table.insert(dataToExport, { Name = loc.Name, CFrameData = {loc.CFrame:GetComponents()} }) end
-                local success, result = pcall(function() local jsonData = HttpService:JSONEncode(dataToExport); setclipboard(jsonData); showNotification("Data disalin ke clipboard!", Color3.fromRGB(50, 200, 50)) end)
-                if not success then showNotification("Gagal mengekspor data!", Color3.fromRGB(200, 50, 50)) end 
-            end)
-            exportButton.Size = UDim2.new(0.5, -2.5, 1, 0)
-            
-            local importButton = createButton(importExportFrame, "Impor", function() 
-                showImportPrompt(function(text) 
-                    if not text or text == "" then return end
-                    local success, decodedData = pcall(HttpService.JSONDecode, HttpService, text)
-                    if not success or type(decodedData) ~= "table" then showNotification("Data impor tidak valid!", Color3.fromRGB(200, 50, 50)); return end
-                    local existingNames = {}; for _, loc in ipairs(savedTeleportLocations) do existingNames[loc.Name] = true end
-                    local importedCount = 0
-                    for _, data in ipairs(decodedData) do 
-                        if type(data) == "table" and data.Name and data.CFrameData and not existingNames[data.Name] then 
-                            local cframe = CFrame.new(unpack(data.CFrameData))
-                            table.insert(savedTeleportLocations, { Name = data.Name, CFrame = cframe })
-                            existingNames[data.Name] = true
-                            importedCount = importedCount + 1 
-                        end 
-                    end
-                    if importedCount > 0 then 
-                        table.sort(savedTeleportLocations, naturalCompare)
-                        saveTeleportData()
-                        updateTeleportList()
-                        showNotification(importedCount .. " lokasi berhasil diimpor!", Color3.fromRGB(50, 200, 50)) 
-                    else 
-                        showNotification("Tidak ada lokasi baru untuk diimpor.", Color3.fromRGB(200, 150, 50)) 
-                    end 
-                end) 
-            end)
-            importButton.Size = UDim2.new(0.5, -2.5, 1, 0)
-            
-            createToggle(TeleportTabContent, "Tampilkan Ikon", areTeleportIconsVisible, function(v)
-                areTeleportIconsVisible = v
-                updateTeleportIconVisibility()
-            end).LayoutOrder = 4
-
-            -- FITUR BARU: AUTO LOOPING TELEPORT DENGAN UI KOMPAK
-            local autoLoopSettingsFrame = Instance.new("Frame", TeleportTabContent)
-            autoLoopSettingsFrame.Name, autoLoopSettingsFrame.Size, autoLoopSettingsFrame.BackgroundTransparency, autoLoopSettingsFrame.Visible, autoLoopSettingsFrame.LayoutOrder = "AutoLoopSettingsFrame", UDim2.new(1, 0, 0, 30), 1, false, 6
-            local settingsLayout = Instance.new("UIListLayout", autoLoopSettingsFrame); settingsLayout.FillDirection, settingsLayout.VerticalAlignment, settingsLayout.Padding = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center, UDim.new(0, 5)
-
-            local function createCompactInput(parent, label, default)
-                local frame = Instance.new("Frame", parent); frame.Size, frame.BackgroundTransparency = UDim2.new(0.4, -12, 1, 0), 1
-                local layout = Instance.new("UIListLayout", frame); layout.FillDirection, layout.VerticalAlignment = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center
-                local textLabel = Instance.new("TextLabel", frame); textLabel.Size = UDim2.new(0, 15, 1, 0); textLabel.Text, textLabel.TextColor3, textLabel.TextSize, textLabel.Font, textLabel.BackgroundTransparency = label, Color3.fromRGB(200,200,200), 11, Enum.Font.SourceSans, 1
-                local textBox = Instance.new("TextBox", frame); textBox.Size = UDim2.new(1, -15, 0, 20); textBox.Text, textBox.BackgroundColor3 = default, Color3.fromRGB(50, 50, 50); textBox.TextColor3, textBox.TextSize, textBox.Font = Color3.fromRGB(255,255,255), 12, Enum.Font.SourceSans; Instance.new("UICorner", textBox).CornerRadius = UDim.new(0, 4)
-                return textBox
+    
+    setupGeneralTab = function()
+        createToggle(GeneralTabContent, "ESP Nama", IsEspNameEnabled, ToggleESPName)
+        createToggle(GeneralTabContent, "ESP Tubuh", IsEspBodyEnabled, ToggleESPBody)
+        createSlider(GeneralTabContent, "Kecepatan Jalan", 0, Settings.MaxWalkSpeed, Settings.WalkSpeed, "", 1, function(v) Settings.WalkSpeed = v; if IsWalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character.Humanoid then LocalPlayer.Character.Humanoid.WalkSpeed = v end end)
+        createToggle(GeneralTabContent, "Jalan Cepat", IsWalkSpeedEnabled, function(v) IsWalkSpeedEnabled = v; ToggleWalkSpeed(v) end)
+        createSlider(GeneralTabContent, "Kecepatan Terbang", 0, Settings.MaxFlySpeed, Settings.FlySpeed, "", 0.1, function(v) Settings.FlySpeed = v end)
+        createToggle(GeneralTabContent, "Terbang", IsFlying, function(v) if v then if UserInputService.TouchEnabled then StartMobileFly() else StartFly() end else if UserInputService.TouchEnabled then StopMobileFly() else StopFly() end end end)
+        createToggle(GeneralTabContent, "Noclip", IsNoclipEnabled, function(v) ToggleNoclip(v) end)
+        createToggle(GeneralTabContent, "Infinity Jump", IsInfinityJumpEnabled, function(v) IsInfinityJumpEnabled = v; saveFeatureStates(); if v then if LocalPlayer.Character and LocalPlayer.Character.Humanoid then infinityJumpConnection = ConnectEvent(UserInputService.JumpRequest, function() LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) end elseif infinityJumpConnection then infinityJumpConnection:Disconnect(); infinityJumpConnection = nil end end)
+        createToggle(GeneralTabContent, "Mode Kebal", IsGodModeEnabled, ToggleGodMode)
+        createToggle(GeneralTabContent, "FE Invisible", IsFEInvisibleEnabled, ToggleFEInvisible)
+        createSlider(GeneralTabContent, "Transparansi Invisible", 0, 100, Settings.FEInvisibleTransparency * 100, "%", 1, function(v)
+            Settings.FEInvisibleTransparency = v / 100
+            if IsFEInvisibleEnabled and LocalPlayer.Character then
+                setCharacterTransparency(LocalPlayer.Character, Settings.FEInvisibleTransparency)
             end
-
-            local repeatInput = createCompactInput(autoLoopSettingsFrame, "U:", "5")
-            local delayInput = createCompactInput(autoLoopSettingsFrame, "D:", "2")
-            local playStopButton = createButton(autoLoopSettingsFrame, "▶️", function() end)
-            playStopButton.Size, playStopButton.BackgroundColor3 = UDim2.new(0.2, 0, 0, 22), Color3.fromRGB(50, 180, 50)
-
-            createToggle(TeleportTabContent, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 5
-
-            playStopButton.MouseButton1Click:Connect(function()
-                if isAutoLooping then -- Tombol Stop ditekan
-                    isAutoLooping = false
-                    playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
-                else -- Tombol Play ditekan
-                    local repetitions, delayTime = tonumber(repeatInput.Text), tonumber(delayInput.Text)
-                    if not repetitions or repetitions <= 0 or not delayTime or delayTime < 0 then showNotification("Input jumlah & delay tidak valid.", Color3.fromRGB(200, 50, 50)); return end
-                    if #savedTeleportLocations == 0 then showNotification("Tidak ada lokasi teleport.", Color3.fromRGB(200, 50, 50)); return end
-                    
-                    isAutoLooping = true
-                    playStopButton.Text, playStopButton.BackgroundColor3 = "⏹️", Color3.fromRGB(200, 50, 50)
-                    
-                    task.spawn(function()
-                        for i = 1, repetitions do
-                            if not isAutoLooping then break end
-                            for _, locData in ipairs(savedTeleportLocations) do
-                                if not isAutoLooping then break end
-                                if LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart then LocalPlayer.Character.HumanoidRootPart.CFrame = locData.CFrame * CFrame.new(0, 3, 0) else isAutoLooping = false; break end
-                                task.wait(delayTime)
-                            end
-                        end
-                        isAutoLooping = false; playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
-                    end)
-                end
-            end)
-        end
-        setupTeleportTab()
+            saveFeatureStates() -- Simpan perubahan transparansi
+        end)
+        createButton(GeneralTabContent, "Buka Touch Fling", CreateTouchFlingGUI)
+        createToggle(GeneralTabContent, "Anti-Fling", antifling_enabled, ToggleAntiFling)
+        createButton(GeneralTabContent, "Buka GUI Magnet", createMagnetGUI)
+        createButton(GeneralTabContent, "Buka GUI Part Controller", createPartControllerGUI)
     end
-    do
-        local function setupVipTab()
-            createToggle(VipTabContent, "Emote VIP", isEmoteEnabled, function(v)
-                isEmoteEnabled = v
-                EmoteToggleButton.Visible = v
-                if not v then
-                    destroyEmoteGUI()
-                end
-                saveFeatureStates()
-            end).LayoutOrder = 1
-            createToggle(VipTabContent, "Animasi VIP", isAnimationEnabled, function(v) 
-                isAnimationEnabled = v; 
-                if isAnimationEnabled then 
-                    initializeAnimationGUI() 
-                    AnimationShowButton.Visible = true
-                else 
-                    destroyAnimationGUI() 
-                    AnimationShowButton.Visible = false
-                end 
-                saveFeatureStates()
-            end).LayoutOrder = 2
-            createToggle(VipTabContent, "Emote Transparan", isEmoteTransparent, function(v)
-                isEmoteTransparent = v
-                applyEmoteTransparency(v)
-                saveFeatureStates()
-            end).LayoutOrder = 3
-            createToggle(VipTabContent, "Animasi transparan", isAnimationTransparent, function(v)
-                isAnimationTransparent = v
-                if isAnimationEnabled and applyAnimationTransparency then applyAnimationTransparency(v) end
-                saveFeatureStates()
-            end).LayoutOrder = 4
-        end
-        setupVipTab()
-    end
-    do
-        local function setupSettingsTab()
-            createToggle(SettingsTabContent, "Kunci Bar Tombol", not isMiniToggleDraggable, function(v) isMiniToggleDraggable = not v end).LayoutOrder = 1
-            createSlider(SettingsTabContent, "Ukuran Tombol Navigasi", 10, 50, 30, "px", 1, function(v)
-                if MiniToggleButton then
-                    MiniToggleButton.Size = UDim2.new(0, v, 0, v)
-                    MiniToggleButton.TextSize = math.floor(v * 0.6)
-                end
-            end).LayoutOrder = 2
-            createButton(SettingsTabContent, "Simpan Posisi UI", saveGuiPositions).LayoutOrder = 3
-            createButton(SettingsTabContent, "Hop Server", function() HopServer() end).LayoutOrder = 4
-            createToggle(SettingsTabContent, "Anti-Lag", IsAntiLagEnabled, ToggleAntiLag).LayoutOrder = 5
-            createToggle(SettingsTabContent, "Boost FPS", IsBoostFPSEnabled, ToggleBoostFPS).LayoutOrder = 6
-            createToggle(SettingsTabContent, "Shift Lock", IsShiftLockEnabled, ToggleShiftLock).LayoutOrder = 9
-            createButton(SettingsTabContent, "Tutup", CloseScript).LayoutOrder = 11
+    
+    setupTeleportTab = function()
+        createButton(TeleportTabContent, "Pindai Ulang Map", function() for _, part in pairs(Workspace:GetDescendants()) do if part:IsA("BasePart") then local nameLower = part.Name:lower(); if (nameLower:find("checkpoint") or nameLower:find("pos") or nameLower:find("finish") or nameLower:find("start")) and not Players:GetPlayerFromCharacter(part.Parent) then addTeleportLocation(part.Name, part.CFrame) end end end end).LayoutOrder = 1
+        createButton(TeleportTabContent, "Simpan Lokasi Saat Ini", function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then local newName = "Kustom " .. (#savedTeleportLocations + 1); addTeleportLocation(newName, LocalPlayer.Character.HumanoidRootPart.CFrame) end end).LayoutOrder = 2
         
-            local logoutButton = createButton(SettingsTabContent, "Logout", HandleLogout)
-            logoutButton.LayoutOrder = 11
-            logoutButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        local importExportFrame = Instance.new("Frame", TeleportTabContent)
+        importExportFrame.Size = UDim2.new(1, 0, 0, 25)
+        importExportFrame.BackgroundTransparency = 1
+        importExportFrame.LayoutOrder = 3
+        local ieLayout = Instance.new("UIListLayout", importExportFrame)
+        ieLayout.FillDirection = Enum.FillDirection.Horizontal
+        ieLayout.Padding = UDim.new(0, 5)
+        
+        local exportButton = createButton(importExportFrame, "Ekspor", function() 
+            if not setclipboard then showNotification("Executor tidak mendukung clipboard!", Color3.fromRGB(200, 50, 50)); return end
+            local dataToExport = {}; for _, loc in ipairs(savedTeleportLocations) do table.insert(dataToExport, { Name = loc.Name, CFrameData = {loc.CFrame:GetComponents()} }) end
+            local success, result = pcall(function() local jsonData = HttpService:JSONEncode(dataToExport); setclipboard(jsonData); showNotification("Data disalin ke clipboard!", Color3.fromRGB(50, 200, 50)) end)
+            if not success then showNotification("Gagal mengekspor data!", Color3.fromRGB(200, 50, 50)) end 
+        end)
+        exportButton.Size = UDim2.new(0.5, -2.5, 1, 0)
+        
+        local importButton = createButton(importExportFrame, "Impor", function() 
+            showImportPrompt(function(text) 
+                if not text or text == "" then return end
+                local success, decodedData = pcall(HttpService.JSONDecode, HttpService, text)
+                if not success or type(decodedData) ~= "table" then showNotification("Data impor tidak valid!", Color3.fromRGB(200, 50, 50)); return end
+                local existingNames = {}; for _, loc in ipairs(savedTeleportLocations) do existingNames[loc.Name] = true end
+                local importedCount = 0
+                for _, data in ipairs(decodedData) do 
+                    if type(data) == "table" and data.Name and data.CFrameData and not existingNames[data.Name] then 
+                        local cframe = CFrame.new(unpack(data.CFrameData))
+                        table.insert(savedTeleportLocations, { Name = data.Name, CFrame = cframe })
+                        existingNames[data.Name] = true
+                        importedCount = importedCount + 1 
+                    end 
+                end
+                if importedCount > 0 then 
+                    table.sort(savedTeleportLocations, naturalCompare)
+                    saveTeleportData()
+                    updateTeleportList()
+                    showNotification(importedCount .. " lokasi berhasil diimpor!", Color3.fromRGB(50, 200, 50)) 
+                else 
+                    showNotification("Tidak ada lokasi baru untuk diimpor.", Color3.fromRGB(200, 150, 50)) 
+                end 
+            end) 
+        end)
+        importButton.Size = UDim2.new(0.5, -2.5, 1, 0)
+        
+        createToggle(TeleportTabContent, "Tampilkan Ikon", areTeleportIconsVisible, function(v)
+            areTeleportIconsVisible = v
+            updateTeleportIconVisibility()
+        end).LayoutOrder = 4
+
+        -- FITUR BARU: AUTO LOOPING TELEPORT DENGAN UI KOMPAK
+        local autoLoopSettingsFrame = Instance.new("Frame", TeleportTabContent)
+        autoLoopSettingsFrame.Name, autoLoopSettingsFrame.Size, autoLoopSettingsFrame.BackgroundTransparency, autoLoopSettingsFrame.Visible, autoLoopSettingsFrame.LayoutOrder = "AutoLoopSettingsFrame", UDim2.new(1, 0, 0, 30), 1, false, 6
+        local settingsLayout = Instance.new("UIListLayout", autoLoopSettingsFrame); settingsLayout.FillDirection, settingsLayout.VerticalAlignment, settingsLayout.Padding = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center, UDim.new(0, 5)
+
+        local function createCompactInput(parent, label, default)
+            local frame = Instance.new("Frame", parent); frame.Size, frame.BackgroundTransparency = UDim2.new(0.4, -12, 1, 0), 1
+            local layout = Instance.new("UIListLayout", frame); layout.FillDirection, layout.VerticalAlignment = Enum.FillDirection.Horizontal, Enum.VerticalAlignment.Center
+            local textLabel = Instance.new("TextLabel", frame); textLabel.Size = UDim2.new(0, 15, 1, 0); textLabel.Text, textLabel.TextColor3, textLabel.TextSize, textLabel.Font, textLabel.BackgroundTransparency = label, Color3.fromRGB(200,200,200), 11, Enum.Font.SourceSans, 1
+            local textBox = Instance.new("TextBox", frame); textBox.Size = UDim2.new(1, -15, 0, 20); textBox.Text, textBox.BackgroundColor3 = default, Color3.fromRGB(50, 50, 50); textBox.TextColor3, textBox.TextSize, textBox.Font = Color3.fromRGB(255,255,255), 12, Enum.Font.SourceSans; Instance.new("UICorner", textBox).CornerRadius = UDim.new(0, 4)
+            return textBox
         end
-        setupSettingsTab()
+
+        local repeatInput = createCompactInput(autoLoopSettingsFrame, "U:", "5")
+        local delayInput = createCompactInput(autoLoopSettingsFrame, "D:", "2")
+        local playStopButton = createButton(autoLoopSettingsFrame, "▶️", function() end)
+        playStopButton.Size, playStopButton.BackgroundColor3 = UDim2.new(0.2, 0, 0, 22), Color3.fromRGB(50, 180, 50)
+
+        createToggle(TeleportTabContent, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 5
+
+        playStopButton.MouseButton1Click:Connect(function()
+            if isAutoLooping then -- Tombol Stop ditekan
+                isAutoLooping = false
+                playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
+            else -- Tombol Play ditekan
+                local repetitions, delayTime = tonumber(repeatInput.Text), tonumber(delayInput.Text)
+                if not repetitions or repetitions <= 0 or not delayTime or delayTime < 0 then showNotification("Input jumlah & delay tidak valid.", Color3.fromRGB(200, 50, 50)); return end
+                if #savedTeleportLocations == 0 then showNotification("Tidak ada lokasi teleport.", Color3.fromRGB(200, 50, 50)); return end
+                
+                isAutoLooping = true
+                playStopButton.Text, playStopButton.BackgroundColor3 = "⏹️", Color3.fromRGB(200, 50, 50)
+                
+                task.spawn(function()
+                    for i = 1, repetitions do
+                        if not isAutoLooping then break end
+                        for _, locData in ipairs(savedTeleportLocations) do
+                            if not isAutoLooping then break end
+                            if LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart then LocalPlayer.Character.HumanoidRootPart.CFrame = locData.CFrame * CFrame.new(0, 3, 0) else isAutoLooping = false; break end
+                            task.wait(delayTime)
+                        end
+                    end
+                    isAutoLooping = false; playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
+                end)
+            end
+        end)
     end
-    do
-        local function setupRekamanTab()
+    
+    setupVipTab = function()
+        createToggle(VipTabContent, "Emote VIP", isEmoteEnabled, function(v)
+            isEmoteEnabled = v
+            EmoteToggleButton.Visible = v
+            if not v then
+                destroyEmoteGUI()
+            end
+            saveFeatureStates()
+        end).LayoutOrder = 1
+        createToggle(VipTabContent, "Animasi VIP", isAnimationEnabled, function(v) 
+            isAnimationEnabled = v; 
+            if isAnimationEnabled then 
+                initializeAnimationGUI() 
+                AnimationShowButton.Visible = true
+            else 
+                destroyAnimationGUI() 
+                AnimationShowButton.Visible = false
+            end 
+            saveFeatureStates()
+        end).LayoutOrder = 2
+        createToggle(VipTabContent, "Emote Transparan", isEmoteTransparent, function(v)
+            isEmoteTransparent = v
+            applyEmoteTransparency(v)
+            saveFeatureStates()
+        end).LayoutOrder = 3
+        createToggle(VipTabContent, "Animasi transparan", isAnimationTransparent, function(v)
+            isAnimationTransparent = v
+            if isAnimationEnabled and applyAnimationTransparency then applyAnimationTransparency(v) end
+            saveFeatureStates()
+        end).LayoutOrder = 4
+    end
+    
+    setupRekamanTab = function()
         -- [[ PERBAIKAN: Tata letak dirombak untuk memperbaiki masalah scrolling ]]
         -- 1. Buat kontainer untuk semua kontrol statis (tombol, input, dll.)
         local controlsContainer = Instance.new("Frame")
@@ -5410,8 +5979,6 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             end
         end)
     end
-        setupRekamanTab()
-    end
 
     -- Fungsi untuk membuka/menutup jendela utama, dipisahkan agar bisa dipanggil oleh MakeDraggable
     local function toggleMainFrame()
@@ -5431,6 +5998,13 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     -- == BAGIAN UTAMA DAN KONEKSI EVENT                                              ==
     -- =================================================================================
     
+    setupPlayerTab()
+    setupGeneralTab()
+    setupTeleportTab()
+    setupVipTab()
+    setupSettingsTab()
+    setupRekamanTab()
+
     MakeDraggable(MainFrame, TitleBar, function() return true end, nil)
 
     -- [[ PERUBAHAN BARU: Logika untuk mengubah ukuran MainFrame (Diperbaiki) ]]
@@ -6410,754 +6984,6 @@ do
 end
 
 print("[ArexansTools] Merged playback fix appended - overrides loaded.")
-
-
--- ====================================================================
--- == MERGED SCRIPT: MAGNET GUI                                      ==
--- ====================================================================
-local function InitializeMagnetGUI()
-    -- magnet.lua (Revisi UI & Fitur oleh Gemini)
-    --[[
-        Skrip ini membuat GUI magnet yang dapat digeser.
-
-        PERUBAHAN v2.7 (Perbaikan Header & Minimize Bug):
-        - Estetika Header: Menambahkan UICorner ke TitleBar agar memiliki sudut membulat di bagian atas.
-        - Tata Letak Header/Konten: Mengatur ContentFrame agar dimulai tepat di bawah TitleBar (Y=25) untuk tampilan yang mulus.
-        - Perbaikan Bug Minimize: Logic minimizedSize dihitung menggunakan ukuran absolut MainFrame (lebar 180, tinggi 25) 
-          untuk mencegah frame meregang ke seluruh layar saat diminimalkan.
-    ]]
-
-    -- Layanan Roblox
-    local TweenService = game:GetService("TweenService")
-    local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
-    local Players = game:GetService("Players")
-    local CoreGui = game:GetService("CoreGui")
-
-    -- Variabel Lokal
-    local LocalPlayer = Players.LocalPlayer
-    local isMagnetActive = false
-    local wasMagnetActive = false -- Menyimpan status magnet sebelum mati/respawn
-    local magnetPower = 999
-    local magnetRange = 150
-
-    local magnetConnection = nil
-    local scannedParts = {} -- Menyimpan parts hasil scan
-    local partGoals = {} -- Menyimpan posisi tujuan untuk mode acak
-    local scanCenterPosition = Vector3.zero -- Titik tengah untuk mode acak
-
-    local notificationFrame, notificationLabel, notificationTween -- Untuk notifikasi global
-    local UI = {} -- Tabel untuk menyimpan referensi elemen UI
-
-    -- Konfigurasi Mode
-    local MODES = {
-        {Name = "Ke Karakter", ID = "target_player"},
-        {Name = "Acak", ID = "random_free"}
-    }
-    local currentModeIndex = 1
-    local magnetDirection = MODES[currentModeIndex].ID
-
-    -- ====================================================================
-    -- == FUNGSI UTILITAS GUI                                            ==
-    -- ====================================================================
-
-    local function makeDraggable(guiObject, dragHandle)
-        local dragInput, dragStart, startPos
-        dragHandle.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput, dragStart, startPos = input, input.Position, guiObject.Position
-            end
-        end)
-        dragHandle.InputChanged:Connect(function(input)
-            if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragInput then
-                local delta = input.Position - dragStart
-                guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            end
-        end)
-        dragHandle.InputEnded:Connect(function(input)
-            if input == dragInput then dragInput = nil end
-        end)
-    end
-
-    local function showNotification(message, color, duration)
-        if not notificationFrame then return end
-        if notificationTween then notificationTween:Cancel() end
-        notificationFrame.Visible = true; notificationLabel.Text = message; notificationLabel.TextColor3 = color
-        TweenService:Create(notificationFrame, TweenInfo.new(0.3), {BackgroundTransparency = 0.2}):Play()
-        TweenService:Create(notificationLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
-        if duration then
-            task.delay(duration, function()
-                notificationTween = TweenService:Create(notificationFrame, TweenInfo.new(0.5), {BackgroundTransparency = 1})
-                notificationTween:Play()
-                TweenService:Create(notificationLabel, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
-                notificationTween.Completed:Connect(function() notificationFrame.Visible = false end)
-            end)
-        end
-    end
-
-    -- ====================================================================
-    -- == LOGIKA INTI MAGNET                                             ==
-    -- ====================================================================
-    local powerTextBox, rangeTextBox
-
-    _G.stopMagnet = function()
-        if not isMagnetActive then return end
-        isMagnetActive = false
-        if magnetConnection then magnetConnection:Disconnect(); magnetConnection = nil end
-        
-        task.spawn(function()
-            for _, part in ipairs(scannedParts) do
-                if part and part.Parent and part:IsA("BasePart") then
-                    part.AssemblyLinearVelocity = Vector3.zero
-                    pcall(function() part:SetNetworkOwner(nil) end)
-                end
-            end
-        end)
-        
-        print("Magnet dihentikan.")
-    end
-
-    local function scanForParts()
-        local rangeValue = tonumber(rangeTextBox.Text)
-        if not rangeValue or rangeValue <= 0 then showNotification("Range tidak valid!", Color3.fromRGB(255, 100, 100), 3); return end
-        
-        _G.stopMagnet()
-        scannedParts = {}
-        partGoals = {} -- Hapus tujuan lama saat scan baru
-        
-        showNotification("Mencari objek...", Color3.fromRGB(220, 220, 220)); task.wait(0.1)
-        local character = LocalPlayer.Character
-        if not character or not character:FindFirstChild("HumanoidRootPart") then showNotification("Karakter tidak ditemukan!", Color3.fromRGB(255, 100, 100), 3); return end
-        
-        scanCenterPosition = character.HumanoidRootPart.Position -- Simpan posisi untuk mode acak
-        
-        local partsInWorkspace = workspace:GetPartBoundsInRadius(scanCenterPosition, rangeValue)
-        for _, part in ipairs(partsInWorkspace) do
-            if part:IsA("BasePart") and not part.Anchored and not character:IsAncestorOf(part) then
-                pcall(function() part:SetNetworkOwner(LocalPlayer) end)
-                table.insert(scannedParts, part)
-            end
-        end
-        local count = #scannedParts
-        showNotification("Scan Selesai: " .. count .. " objek ditemukan.", Color3.fromRGB(100, 255, 100), 4)
-        if UI.statusLabel then
-            UI.statusLabel.Text = "Parts: " .. count
-            UI.statusLabel.TextColor3 = Color3.fromRGB(120, 255, 120)
-        end
-        print("Scanning selesai. Ditemukan " .. count .. " part.")
-    end
-
-    local function playMagnet()
-        if isMagnetActive then return false end
-        local powerValue = tonumber(powerTextBox.Text)
-        if not powerValue or powerValue <= 0 then showNotification("Power tidak valid!", Color3.fromRGB(255, 100, 100), 3); return false end
-        magnetPower = powerValue
-        if #scannedParts == 0 then showNotification("Tidak ada objek hasil scan. Scan dulu!", Color3.fromRGB(255, 200, 100), 3); return false end
-        isMagnetActive = true
-        print("Magnet dimulai pada " .. #scannedParts .. " part yang di-scan.")
-
-        magnetConnection = RunService.Heartbeat:Connect(function(deltaTime)
-            if not isMagnetActive then
-                if magnetConnection then magnetConnection:Disconnect(); magnetConnection = nil end
-                return
-            end
-            local character = LocalPlayer.Character
-            local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-            if not rootPart then _G.stopMagnet(); return end
-            
-            local forceMultiplier = magnetPower * 2500 * deltaTime
-
-            for i = #scannedParts, 1, -1 do
-                local part = scannedParts[i]
-                if part and part.Parent then
-                    local targetPosition
-                    
-                    if magnetDirection == "random_free" then
-                        local goal = partGoals[part]
-                        local distanceToGoal = goal and (part.Position - goal).Magnitude or 100
-                        
-                        if not goal or distanceToGoal < 15 then
-                            local randomOffset = Vector3.new(
-                                math.random(-magnetRange, magnetRange),
-                                math.random(5, 50),
-                                math.random(-magnetRange, magnetRange)
-                            )
-                            partGoals[part] = scanCenterPosition + randomOffset
-                        end
-                        targetPosition = partGoals[part]
-                    else -- Mode "Ke Karakter"
-                        targetPosition = rootPart.Position
-                    end
-
-                    local direction = (targetPosition - part.Position)
-                    local distance = direction.Magnitude
-                    if distance < 1 then distance = 1 end
-                    
-                    local velocity = direction.Unit * forceMultiplier * (1 / distance)
-                    part.AssemblyLinearVelocity = velocity
-                else
-                    table.remove(scannedParts, i)
-                end
-            end
-        end)
-        return true
-    end
-
-    -- ====================================================================
-    -- == INISIALISASI GUI                                               ==
-    -- ====================================================================
-    if CoreGui:FindFirstChild("MagnetGUI") then CoreGui:FindFirstChild("MagnetGUI"):Destroy() end
-    local ScreenGui = Instance.new("ScreenGui", CoreGui); ScreenGui.Name = "MagnetGUI"; ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; ScreenGui.ResetOnSpawn = false
-    
-    local MainFrame = Instance.new("Frame", ScreenGui)
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 180, 0, 95)
-    MainFrame.Position = UDim2.new(0.1, 0, 0.5, -55)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    MainFrame.BackgroundTransparency = 0.5
-    local MainUICorner = Instance.new("UICorner", MainFrame); MainUICorner.CornerRadius = UDim.new(0, 8)
-    local UIStroke = Instance.new("UIStroke", MainFrame); UIStroke.Color = Color3.fromRGB(0, 150, 255); UIStroke.Thickness = 1.5
-
-    local TitleBar = Instance.new("TextButton", MainFrame)
-    TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 25)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25); TitleBar.Text = ""
-    local TitleBarCorner = Instance.new("UICorner", TitleBar); TitleBarCorner.CornerRadius = UDim.new(0, 8)
-    TitleBar.AutoButtonColor = false; makeDraggable(MainFrame, TitleBar)
-
-    local TitleLabel = Instance.new("TextLabel", TitleBar)
-    TitleLabel.Size = UDim2.new(0.4, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 8, 0, 0)
-    TitleLabel.BackgroundTransparency = 1; TitleLabel.Text = "Magnet"
-    TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255); TitleLabel.TextSize = 12
-    TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-    UI.statusLabel = Instance.new("TextLabel", TitleBar)
-    UI.statusLabel.Size = UDim2.new(0.5, 0, 1, 0); UI.statusLabel.Position = UDim2.new(0.3, 0, 0, 0)
-    UI.statusLabel.BackgroundTransparency = 1; UI.statusLabel.Text = "Parts: 0"
-    UI.statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180); UI.statusLabel.TextSize = 10
-    UI.statusLabel.Font = Enum.Font.SourceSans; UI.statusLabel.TextXAlignment = Enum.TextXAlignment.Center
-    
-    local closeBtn = Instance.new("TextButton",TitleBar)
-    closeBtn.Size = UDim2.new(0,18,0,18); closeBtn.Position = UDim2.new(1,-22,0.5,-9); closeBtn.BackgroundTransparency = 1; closeBtn.Font = Enum.Font.SourceSansBold; closeBtn.Text = "X"; closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); closeBtn.TextSize = 16
-
-    local minimizeBtn = Instance.new("TextButton", TitleBar)
-    minimizeBtn.Size = UDim2.new(0, 18, 0, 18); minimizeBtn.Position = UDim2.new(1, -42, 0.5, -9); minimizeBtn.BackgroundTransparency = 1; minimizeBtn.Font = Enum.Font.SourceSansBold; minimizeBtn.Text = "-"; minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); minimizeBtn.TextSize = 20
-
-    local ContentFrame = Instance.new("Frame", MainFrame)
-    ContentFrame.Name = "ContentFrame"; ContentFrame.ClipsDescendants = true
-    ContentFrame.Size = UDim2.new(1, -10, 1, -30) -- Lebar 170px
-    ContentFrame.Position = UDim2.new(0, 5, 0, 25)
-    ContentFrame.BackgroundTransparency = 1
-    local ContentLayout = Instance.new("UIListLayout", ContentFrame); ContentLayout.Padding = UDim.new(0, 4)
-
-    local function createIconButton(parent, text, size, callback)
-        local btn = Instance.new("TextButton", parent)
-        btn.Size = UDim2.new(0, size, 0, 24); btn.Text = text
-        btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 16
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        local corner = Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 5)
-        if callback then btn.MouseButton1Click:Connect(callback) end
-        return btn
-    end
-    
-    local function createCompactTextBox(parent, name, defaultValue)
-        local frame = Instance.new("Frame", parent)
-        frame.BackgroundTransparency = 1; frame.Size = UDim2.new(0, 55, 0, 24)
-        
-        local label = Instance.new("TextLabel", frame)
-        label.Size = UDim2.new(1, 0, 0, 12); label.BackgroundTransparency = 1; label.Font = Enum.Font.SourceSans
-        label.Text = name; label.TextColor3 = Color3.fromRGB(200, 200, 200); label.TextSize = 10
-        label.TextXAlignment = Enum.TextXAlignment.Center
-        
-        local textBox = Instance.new("TextBox", frame)
-        textBox.Size = UDim2.new(1, 0, 1, -12); textBox.Position = UDim2.new(0, 0, 0, 12)
-        textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35); textBox.TextColor3 = Color3.fromRGB(220, 220, 220)
-        textBox.Text = tostring(defaultValue); textBox.Font = Enum.Font.SourceSans; textBox.TextSize = 11
-        textBox.TextXAlignment = Enum.TextXAlignment.Center
-        local corner = Instance.new("UICorner", textBox); corner.CornerRadius = UDim.new(0, 4)
-        
-        return frame, textBox 
-    end
-
-    local controlsRow = Instance.new("Frame", ContentFrame)
-    controlsRow.BackgroundTransparency = 1; controlsRow.Size = UDim2.new(1, 0, 0, 28)
-
-    local rangeFrame
-    rangeFrame, rangeTextBox = createCompactTextBox(controlsRow, "Range", magnetRange)
-    rangeFrame.Position = UDim2.new(0, 0, 0.5, -12)
-
-    local powerFrame 
-    powerFrame, powerTextBox = createCompactTextBox(controlsRow, "Power", magnetPower)
-    powerFrame.Position = UDim2.new(0, 70, 0.5, -12)
-
-    local scanButton = createIconButton(controlsRow, "📡", 30, scanForParts)
-    scanButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
-    scanButton.Position = UDim2.new(0, 140, 0.5, -12) 
-
-    local modeRow = Instance.new("Frame", ContentFrame)
-    modeRow.BackgroundTransparency = 1; modeRow.Size = UDim2.new(1, 0, 0, 28)
-
-    local prevBtn = createIconButton(modeRow, "<", 25)
-    prevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    prevBtn.Position = UDim2.new(0, 0, 0.5, -12)
-
-    local nextBtn = createIconButton(modeRow, ">", 25)
-    nextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    nextBtn.Position = UDim2.new(0, 95, 0.5, -12)
-
-    local modeLabel = Instance.new("TextLabel", modeRow)
-    modeLabel.Size = UDim2.new(0, 70, 1, 0); 
-    modeLabel.Position = UDim2.new(0, 25, 0, 0)
-    modeLabel.BackgroundTransparency = 1; modeLabel.Font = Enum.Font.SourceSansBold
-    modeLabel.TextSize = 10; modeLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    modeLabel.TextWrapped = true; modeLabel.TextXAlignment = Enum.TextXAlignment.Center
-    
-    UI.toggleButton = createIconButton(modeRow, "▶️", 30)
-    UI.toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    UI.toggleButton.Position = UDim2.new(1, -30, 0.5, -12)
-    
-    local function updateModeDisplay()
-        local currentModeData = MODES[currentModeIndex]
-        magnetDirection = currentModeData.ID
-        modeLabel.Text = currentModeData.Name
-    end
-    
-    prevBtn.MouseButton1Click:Connect(function()
-        currentModeIndex = currentModeIndex - 1
-        if currentModeIndex < 1 then currentModeIndex = #MODES end
-        updateModeDisplay()
-    end)
-    
-    nextBtn.MouseButton1Click:Connect(function()
-        currentModeIndex = currentModeIndex + 1
-        if currentModeIndex > #MODES then currentModeIndex = 1 end
-        updateModeDisplay()
-    end)
-    
-    updateModeDisplay()
-
-    local function toggleMagnet()
-        if isMagnetActive then
-            _G.stopMagnet(); wasMagnetActive = false; UI.toggleButton.Text = "▶️"; UI.toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-        else
-            if playMagnet() then wasMagnetActive = true; UI.toggleButton.Text = "⏹️"; UI.toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) end
-        end
-    end
-    UI.toggleButton.MouseButton1Click:Connect(toggleMagnet)
-    
-    closeBtn.MouseButton1Click:Connect(function() if isMagnetActive then _G.stopMagnet() end; ScreenGui:Destroy() end)
-    
-    local isMinimized = false; 
-    local originalSize = MainFrame.Size
-    
-    local minimizedSize = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, TitleBar.Size.Y.Offset)
-    
-    minimizeBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized
-        ContentFrame.Visible = not isMinimized
-        
-        local targetSize = isMinimized and minimizedSize or originalSize
-        TweenService:Create(MainFrame, TweenInfo.new(0.2), {Size = targetSize}):Play()
-    end)
-
-    if CoreGui:FindFirstChild("ScanNotificationGui") then CoreGui:FindFirstChild("ScanNotificationGui"):Destroy() end
-    local notifScreenGui = Instance.new("ScreenGui", CoreGui); notifScreenGui.Name = "ScanNotificationGui"; notifScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; notifScreenGui.ResetOnSpawn = false
-    notificationFrame = Instance.new("Frame", notifScreenGui); notificationFrame.Name = "NotificationFrame"; notificationFrame.Size = UDim2.new(0, 280, 0, 35)
-    notificationFrame.Position = UDim2.new(0.5, -140, 1, -80); notificationFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    notificationFrame.BackgroundTransparency = 1; notificationFrame.Visible = false; local corner = Instance.new("UICorner", notificationFrame); corner.CornerRadius = UDim.new(0, 6)
-    local stroke = Instance.new("UIStroke", notificationFrame); stroke.Color = Color3.fromRGB(80, 80, 80); stroke.Thickness = 1
-    notificationLabel = Instance.new("TextLabel", notificationFrame); notificationLabel.Name = "NotificationLabel"; notificationLabel.Size = UDim2.new(1, 0, 1, 0); notificationLabel.BackgroundTransparency = 1
-    notificationLabel.Font = Enum.Font.SourceSansBold; notificationLabel.Text = ""; notificationLabel.TextColor3 = Color3.fromRGB(255, 255, 255); notificationLabel.TextSize = 14; notificationLabel.TextTransparency = 1
-
-    local function handleRespawn(character)
-        task.wait(0.5)
-        if wasMagnetActive then
-            if playMagnet() and UI.toggleButton then
-                UI.toggleButton.Text = "⏹️"
-                UI.toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            end
-        end
-    end
-
-    task.spawn(function()
-        scanForParts()
-        task.wait(0.2)
-        if #scannedParts > 0 then
-            if playMagnet() then
-                wasMagnetActive = true
-                if UI.toggleButton then
-                    UI.toggleButton.Text = "⏹️"
-                    UI.toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-                end
-            end
-        end
-    end)
-
-    LocalPlayer.CharacterAdded:Connect(handleRespawn)
-
-    print("Magnet.lua (Revisi Gemini v2.7) loaded.")
-end
-
-
--- ====================================================================
--- == MERGED SCRIPT: PART CONTROLLER GUI                             ==
--- ====================================================================
-local function InitializePartControllerGUI()
-    print("Loading Arexans Part Controller")
-
-    -- Layanan Roblox
-    local Players = game:GetService("Players")
-    local RunService = game:GetService("RunService")
-    local UserInputService = game:GetService("UserInputService")
-    local TweenService = game:GetService("TweenService")
-    local CoreGui = game:GetService("CoreGui")
-
-    local player = Players.LocalPlayer
-    repeat task.wait() until player.Character
-
-    -- Config
-    local config = {
-        partLimit = 100,
-        radius = 150,
-        magnetForce = 1000000,
-        speed = 5,
-        launchSpeed = 100,
-        updateRate = 0.03,
-        batchSize = 10
-    }
-
-    -- State
-    local state = {
-        mode = "bring",
-        active = false,
-        parts = {},
-        originalProperties = {},
-        removedItems = {}, -- DITAMBAHKAN: Untuk menyimpan tali/sambungan yang "dihapus"
-        timeOffset = 0,
-        connection = nil,
-        bodyPositions = {},
-        currentModeIndex = 1
-    }
-
-    -- UI References Table
-    local UI = {}
-
-    -- Modes
-    local MODES = {
-        {n="Bring",v="bring"}, {n="Ring",v="ring"}, {n="Tornado",v="tornado"},
-        {n="Blackhole",v="blackhole"}, {n="Orbit",v="orbit"}, {n="Spiral",v="spiral"},
-        {n="Wave",v="wave"}, {n="Fountain",v="fountain"}, {n="Shield",v="shield"},
-        {n="Sphere",v="sphere"}, {n="Launch",v="launch"}, {n="Explosion",v="explosion"},
-        {n="Galaxy",v="galaxy"}, {n="DNA",v="dna"}, {n="Supernova",v="supernova"},
-        {n="Matrix",v="matrix"}, {n="Vortex",v="vortex"}, {n="Meteor",v="meteor"},
-        {n="Portal",v="portal"}, {n="Dragon",v="dragon"}, {n="Infinity",v="infinity"},
-        {n="Tsunami",v="tsunami"}, {n="Solar",v="solar"}, {n="Quantum",v="quantum"}
-    }
-
-    -- ====================================================================
-    -- == FUNGSI LOGIKA INTI                                           ==
-    -- ====================================================================
-    local function log(m) print("[AREXANS] "..m) end
-    local function getPos() return player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position end
-    local function getLook() return player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.CFrame.LookVector or Vector3.new(0,0,-1) end
-
-    local function updatePlayStopButtonVisuals()
-        if UI.toggleButton then
-            if state.active then
-                UI.toggleButton.Text = "⏹️"
-                UI.toggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            else
-                UI.toggleButton.Text = "▶️"
-                UI.toggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-            end
-        end
-    end
-
-    local function cleanBodyPositions()
-        for _, bp in pairs(state.bodyPositions) do
-            if bp and bp.Parent then bp:Destroy() end
-        end
-        state.bodyPositions = {}
-    end
-
-    local function clearAndStoreConstraints()
-        log("Menyimpan sementara semua tali dan sambungan...")
-        if not UI.temporaryStorage then log("Error: Penyimpanan sementara tidak ditemukan!") return 0 end
-        
-        local storedCount = 0
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("RopeConstraint") or obj:IsA("WeldConstraint") or obj:IsA("Weld") or (obj:IsA("Attachment") and not obj.Parent:FindFirstChildOfClass("Humanoid")) then
-                pcall(function()
-                    local isStored = false
-                    for _, entry in pairs(state.removedItems) do if entry.item == obj then isStored = true break end end
-                    
-                    if not isStored then
-                        table.insert(state.removedItems, {item = obj, parent = obj.Parent})
-                        obj.Parent = UI.temporaryStorage
-                        storedCount = storedCount + 1
-                    end
-                end)
-            end
-        end
-        log("Menyimpan "..storedCount.." tali/sambungan.")
-        return storedCount
-    end
-
-    local function scan()
-        log("Memulai scan baru...")
-        state.parts = {}
-        cleanBodyPositions()
-        local p = getPos()
-        if not p then log("Tidak bisa scan - Posisi pemain tidak ditemukan") return {} end
-        
-        local scanned = 0
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if scanned >= config.partLimit then break end
-            if obj:IsA("BasePart") and not (player.Character and obj:IsDescendantOf(player.Character)) then
-                if (obj.Position - p).Magnitude <= config.radius then
-                    pcall(function()
-                        if not state.originalProperties[obj] then
-                            state.originalProperties[obj] = {Anchored = obj.Anchored, CanCollide = obj.CanCollide}
-                        end
-                        
-                        for _, c in pairs(obj:GetChildren()) do
-                            if c:IsA("Constraint") or c:IsA("Weld") or c:IsA("Attachment") then
-                                local isStored = false
-                                for _, entry in pairs(state.removedItems) do if entry.item == c then isStored = true break end end
-                                if not isStored and UI.temporaryStorage then
-                                    table.insert(state.removedItems, {item = c, parent = c.Parent})
-                                    c.Parent = UI.temporaryStorage
-                                end
-                            end
-                        end
-                        
-                        obj.Anchored = false
-                        obj.CanCollide = false
-                        table.insert(state.parts, obj)
-                        scanned = scanned + 1
-                    end)
-                end
-            end
-        end
-        log("Menscan "..#state.parts.." part dalam radius "..config.radius)
-        return state.parts
-    end
-
-    local function force(part, targetPos)
-        if not part or not part.Parent then return end
-        pcall(function()
-            part.Anchored = false
-            part.CanCollide = false
-            for _, child in pairs(part:GetChildren()) do if child:IsA("BodyPosition") or child:IsA("BodyVelocity") or child:IsA("BodyGyro") then child:Destroy() end end
-            local bp = Instance.new("BodyPosition")
-            bp.MaxForce = Vector3.new(config.magnetForce, config.magnetForce, config.magnetForce)
-            bp.Position = targetPos; bp.P = 10000; bp.D = 500; bp.Parent = part
-            table.insert(state.bodyPositions, bp)
-        end)
-    end
-
-    local modes = {}
-    modes.bring = function() local p=getPos() if not p then return end for i,pt in pairs(state.parts) do if pt and pt.Parent then local o=Vector3.new(math.random(-15,15),math.random(10,30),math.random(-15,15)) force(pt,p+o) end end end
-    modes.ring = function() local p=getPos() if not p then return end local t=tick()*config.speed*0.5 for i,pt in pairs(state.parts) do if pt and pt.Parent then local a=((i/#state.parts)*math.pi*2)+t local r=8 local o=Vector3.new(math.cos(a)*r,5,math.sin(a)*r) force(pt,p+o) end end end
-    modes.tornado = function() local p=getPos() if not p then return end local t=tick()*config.speed for i,pt in pairs(state.parts) do if pt and pt.Parent then local h=((i-1)%10)*4 local r=5+(h/8) local a=t+(i*0.5) local o=Vector3.new(math.cos(a)*r,h,math.sin(a)*r) force(pt,p+o) end end end
-    modes.blackhole = function() local p=getPos() if not p then return end local c=p+Vector3.new(0,10,0) local t=tick()*config.speed for i,pt in pairs(state.parts) do if pt and pt.Parent then local a=(i*0.5)+(t*0.3) local r=3 local o=Vector3.new(math.cos(a)*r,math.sin(t+i*0.2)*2,math.sin(a)*r) force(pt,c+o) end end end
-    modes.orbit = function() local p=getPos() if not p then return end local c=p+Vector3.new(0,8,0) local t=tick()*config.speed*0.3 for i,pt in pairs(state.parts) do if pt and pt.Parent then local r=10+((i%3)*3) local a=t+(i*0.8) local o=Vector3.new(math.cos(a)*r,math.sin(a*0.5)*4,math.sin(a)*r) force(pt,c+o) end end end
-    modes.spiral = function() local p=getPos() if not p then return end local t=tick()*config.speed*0.5 for i,pt in pairs(state.parts) do if pt and pt.Parent then local h=p.Y+(i*1)+(t%15) local a=(i*0.5)+t local r=8 force(pt,Vector3.new(p.X+math.cos(a)*r,h,p.Z+math.sin(a)*r)) end end end
-    modes.wave = function() local p=getPos() if not p then return end local t=tick()*config.speed for i,pt in pairs(state.parts) do if pt and pt.Parent then local h=p.Y+8+math.sin(t+i*0.5)*5 force(pt,Vector3.new(p.X+((i%10)*3)-15,h,p.Z+math.cos(t+i*0.3)*5)) end end end
-    modes.fountain = function() local p=getPos() if not p then return end local t=tick()*config.speed for i,pt in pairs(state.parts) do if pt and pt.Parent then local a=(i/#state.parts)*math.pi*2 local h=p.Y+3+math.abs(math.sin(t+i*0.5))*12 local r=4 force(pt,Vector3.new(p.X+math.cos(a)*r,h,p.Z+math.sin(a)*r)) end end end
-    modes.shield = function() local p=getPos() if not p then return end local t=tick()*config.speed for i,pt in pairs(state.parts) do if pt and pt.Parent then local a=((i/#state.parts)*math.pi*2)+t local r=8 force(pt,Vector3.new(p.X+math.cos(a)*r,p.Y+2,p.Z+math.sin(a)*r)) end end end
-    modes.sphere = function() local p=getPos() if not p then return end local c=p+Vector3.new(0,10,0) for i,pt in pairs(state.parts) do if pt and pt.Parent then local phi=math.acos(-1+(2*i)/#state.parts) local theta=math.sqrt(#state.parts*math.pi)*phi local r=10 local o=Vector3.new(r*math.cos(theta)*math.sin(phi),r*math.cos(phi),r*math.sin(theta)*math.sin(phi)) force(pt,c+o) end end end
-    modes.launch = function() local p=getPos() if not p then return end local l=getLook() for i=1,math.min(5,#state.parts) do local idx=((state.timeOffset+i-1)%#state.parts)+1 local pt=state.parts[idx] if pt and pt.Parent then pcall(function() pt:BreakJoints() for _,c in pairs(pt:GetChildren()) do if c:IsA("BodyVelocity") then c:Destroy() end end local bv=Instance.new("BodyVelocity") bv.MaxForce=Vector3.new(math.huge,math.huge,math.huge) bv.Velocity=l*config.launchSpeed+Vector3.new(math.random(-10,10),math.random(0,20),math.random(-10,10)) bv.Parent=pt task.delay(2,function() if bv and bv.Parent then bv:Destroy() end end) end) end end end
-    modes.explosion=modes.launch; modes.galaxy=modes.ring; modes.dna=modes.spiral; modes.supernova=modes.blackhole; modes.matrix=modes.bring; modes.vortex=modes.tornado; modes.meteor=modes.launch; modes.portal=modes.ring; modes.dragon=modes.spiral; modes.infinity=modes.wave; modes.tsunami=modes.wave; modes.solar=modes.orbit; modes.quantum=modes.bring
-
-    local function startPartController()
-        if state.active then return end
-        if #state.parts == 0 then scan() end
-        if #state.parts == 0 then log("Tidak bisa mulai - tidak ada part ditemukan!"); return end
-        
-        state.active = true
-        state.timeOffset = 0
-        log("Dimulai: "..state.mode.." dengan "..#state.parts.." part")
-        state.connection = RunService.Heartbeat:Connect(function()
-            if not state.active then return end
-            state.timeOffset = (state.timeOffset + config.batchSize) % #state.parts
-            local fn = modes[state.mode]
-            if fn then pcall(fn) end
-        end)
-        updatePlayStopButtonVisuals()
-    end
-
-    local function stopPartController()
-        if state.connection then state.connection:Disconnect(); state.connection=nil end
-        state.active = false
-        cleanBodyPositions()
-        log("Berhenti!")
-        updatePlayStopButtonVisuals()
-    end
-
-    _G.fullRestore_PartController = function()
-        log("Memulai proses pengembalian total...")
-        stopPartController()
-
-        log("Mengembalikan "..#state.removedItems.." tali/sambungan...")
-        for _, entry in pairs(state.removedItems) do
-            if entry.item and entry.parent and entry.parent.Parent then
-                pcall(function() entry.item.Parent = entry.parent end)
-            end
-        end
-
-        log("Mengembalikan properti fisika untuk part...")
-        for part, properties in pairs(state.originalProperties) do
-            if part and part.Parent then
-                pcall(function()
-                    part.Anchored = properties.Anchored
-                    part.CanCollide = properties.CanCollide
-                end)
-            end
-        end
-
-        log("Membersihkan state skrip...")
-        state.parts = {}
-        state.originalProperties = {}
-        state.removedItems = {}
-        if UI.statusLabel then UI.statusLabel.Text = "Parts: 0" end
-        log("Pengembalian total selesai. Skrip telah di-reset sepenuhnya.")
-    end
-
-    if CoreGui:FindFirstChild("ArexansPartControllerGUI") then CoreGui:FindFirstChild("ArexansPartControllerGUI"):Destroy() end
-    local ScreenGui = Instance.new("ScreenGui", CoreGui); ScreenGui.Name = "ArexansPartControllerGUI"; ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; ScreenGui.ResetOnSpawn = false
-    
-    UI.temporaryStorage = Instance.new("Folder", ScreenGui); UI.temporaryStorage.Name = "TemporaryStorage"
-
-    local MainFrame = Instance.new("Frame", ScreenGui)
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 180, 0, 95)
-    MainFrame.Position = UDim2.new(0.5, -90, 0.5, -47)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    MainFrame.BackgroundTransparency = 0.5
-    local MainUICorner = Instance.new("UICorner", MainFrame); MainUICorner.CornerRadius = UDim.new(0, 8)
-    local UIStroke = Instance.new("UIStroke", MainFrame); UIStroke.Color = Color3.fromRGB(0, 150, 255); UIStroke.Thickness = 1.5
-
-    local TitleBar = Instance.new("TextButton", MainFrame)
-    TitleBar.Name = "TitleBar"; TitleBar.Size = UDim2.new(1, 0, 0, 25)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25); TitleBar.Text = ""
-    local TitleBarCorner = Instance.new("UICorner", TitleBar); TitleBarCorner.CornerRadius = UDim.new(0, 8)
-    TitleBar.AutoButtonColor = false
-
-    local TitleLabel = Instance.new("TextLabel", TitleBar)
-    TitleLabel.Size = UDim2.new(0.4, 0, 1, 0); TitleLabel.Position = UDim2.new(0, 8, 0, 0)
-    TitleLabel.BackgroundTransparency = 1; TitleLabel.Text = "P-Controller"
-    TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255); TitleLabel.TextSize = 12
-    TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-    UI.statusLabel = Instance.new("TextLabel", TitleBar)
-    UI.statusLabel.Size = UDim2.new(0.5, 0, 1, 0); UI.statusLabel.Position = UDim2.new(0.3, 0, 0, 0)
-    UI.statusLabel.BackgroundTransparency = 1; UI.statusLabel.Text = "Parts: 0"
-    UI.statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180); UI.statusLabel.TextSize = 10
-    UI.statusLabel.Font = Enum.Font.SourceSans; UI.statusLabel.TextXAlignment = Enum.TextXAlignment.Center
-    
-    local closeBtn = Instance.new("TextButton",TitleBar)
-    closeBtn.Size = UDim2.new(0,18,0,18); closeBtn.Position = UDim2.new(1,-22,0.5,-9); closeBtn.BackgroundTransparency = 1; closeBtn.Font = Enum.Font.SourceSansBold; closeBtn.Text = "X"; closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); closeBtn.TextSize = 16
-
-    local minimizeBtn = Instance.new("TextButton", TitleBar)
-    minimizeBtn.Size = UDim2.new(0, 18, 0, 18); minimizeBtn.Position = UDim2.new(1, -42, 0.5, -9); minimizeBtn.BackgroundTransparency = 1; minimizeBtn.Font = Enum.Font.SourceSansBold; minimizeBtn.Text = "-"; minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255); minimizeBtn.TextSize = 20
-
-    local function makeDraggable(guiObject, dragHandle)
-        local dragInput, dragStart, startPos
-        dragHandle.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragInput, dragStart, startPos = input, input.Position, guiObject.Position end end)
-        dragHandle.InputChanged:Connect(function(input) if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragInput then local delta = input.Position - dragStart; guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end)
-        dragHandle.InputEnded:Connect(function(input) if input == dragInput then dragInput = nil end end)
-    end
-    makeDraggable(MainFrame, TitleBar)
-
-    local ContentFrame = Instance.new("Frame", MainFrame)
-    ContentFrame.Name = "ContentFrame"; ContentFrame.ClipsDescendants = true
-    ContentFrame.Size = UDim2.new(1, -10, 1, -30)
-    ContentFrame.Position = UDim2.new(0, 5, 0, 25)
-    ContentFrame.BackgroundTransparency = 1
-    local ContentLayout = Instance.new("UIListLayout", ContentFrame); ContentLayout.Padding = UDim.new(0, 4)
-
-    local function createIconButton(parent, text, size, callback)
-        local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(0, size, 0, 24); btn.Text = text
-        btn.Font = Enum.Font.SourceSansBold; btn.TextSize = 16; btn.TextColor3 = Color3.new(1, 1, 1)
-        local corner = Instance.new("UICorner", btn); corner.CornerRadius = UDim.new(0, 5)
-        if callback then btn.MouseButton1Click:Connect(callback) end
-        return btn
-    end
-    
-    local function createCompactTextBox(parent, name, defaultValue, callback)
-        local frame = Instance.new("Frame", parent); frame.BackgroundTransparency = 1; frame.Size = UDim2.new(0, 48, 0, 24)
-        local label = Instance.new("TextLabel", frame); label.Size = UDim2.new(1, 0, 0, 12); label.BackgroundTransparency = 1; label.Font = Enum.Font.SourceSans
-        label.Text = name; label.TextColor3 = Color3.fromRGB(200, 200, 200); label.TextSize = 10; label.TextXAlignment = Enum.TextXAlignment.Center
-        local textBox = Instance.new("TextBox", frame); textBox.Size = UDim2.new(1, 0, 1, -12); textBox.Position = UDim2.new(0, 0, 0, 12)
-        textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35); textBox.TextColor3 = Color3.fromRGB(220, 220, 220); textBox.Text = tostring(defaultValue); textBox.Font = Enum.Font.SourceSans; textBox.TextSize = 11
-        textBox.TextXAlignment = Enum.TextXAlignment.Center; textBox.ClearTextOnFocus = false
-        local corner = Instance.new("UICorner", textBox); corner.CornerRadius = UDim.new(0, 4)
-        textBox.FocusLost:Connect(function(enterPressed) local num = tonumber(textBox.Text) if num and callback then callback(num) else textBox.Text = tostring(defaultValue) end end)
-        return frame, textBox 
-    end
-
-    local controlsRow = Instance.new("Frame", ContentFrame)
-    controlsRow.BackgroundTransparency = 1; controlsRow.Size = UDim2.new(1, 0, 0, 28)
-    local radiusFrame, radiusBox = createCompactTextBox(controlsRow, "Radius", config.radius, function(v) config.radius = v end); radiusFrame.Position = UDim2.new(0, 0, 0.5, -12)
-    local speedFrame, speedBox = createCompactTextBox(controlsRow, "Speed", config.speed, function(v) config.speed = v; config.launchSpeed = v * 20 end); speedFrame.Position = UDim2.new(0, 52, 0.5, -12)
-    
-    local destroyBtn = createIconButton(controlsRow, "🚯", 30, function()
-        destroyBtn.Text = "..."
-        task.spawn(function()
-            local n = clearAndStoreConstraints(); destroyBtn.Text = "🚯"; UI.statusLabel.Text = "Stored "..n; UI.statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
-            task.wait(2); UI.statusLabel.Text = "Parts: "..#state.parts; UI.statusLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-        end)
-    end)
-    destroyBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40); destroyBtn.Position = UDim2.new(0, 104, 0.5, -12) 
-    
-    local isScanning = false
-    local scanButton = createIconButton(controlsRow, "🔍", 30, function()
-        if isScanning then return end; isScanning = true; UI.statusLabel.Text = "Scanning..."; UI.statusLabel.TextColor3 = Color3.fromRGB(255, 180, 80)
-        task.spawn(function()
-            task.wait(); local foundParts = scan(); UI.statusLabel.Text = "Parts: " .. #foundParts; UI.statusLabel.TextColor3 = Color3.fromRGB(120, 255, 120); isScanning = false
-        end)
-    end)
-    scanButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255); scanButton.Position = UDim2.new(0, 138, 0.5, -12)
-
-    local modeRow = Instance.new("Frame", ContentFrame); modeRow.BackgroundTransparency = 1; modeRow.Size = UDim2.new(1, 0, 0, 28)
-    local prevBtn = createIconButton(modeRow, "<", 25); prevBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); prevBtn.Position = UDim2.new(0, 0, 0.5, -12)
-    local modeLabel = Instance.new("TextLabel", modeRow); modeLabel.Size = UDim2.new(0, 70, 1, 0); modeLabel.Position = UDim2.new(0, 29, 0, 0)
-    modeLabel.BackgroundTransparency = 1; modeLabel.Font = Enum.Font.SourceSansBold; modeLabel.TextSize = 10; modeLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    modeLabel.TextWrapped = true; modeLabel.TextXAlignment = Enum.TextXAlignment.Center
-    local nextBtn = createIconButton(modeRow, ">", 25); nextBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60); nextBtn.Position = UDim2.new(0, 103, 0.5, -12)
-    UI.toggleButton = createIconButton(modeRow, "▶️", 30); UI.toggleButton.Position = UDim2.new(0, 138, 0.5, -12)
-    
-    local function updateModeDisplay() local currentModeData = MODES[state.currentModeIndex]; state.mode = currentModeData.v; modeLabel.Text = currentModeData.n end
-    prevBtn.MouseButton1Click:Connect(function() state.currentModeIndex = state.currentModeIndex - 1; if state.currentModeIndex < 1 then state.currentModeIndex = #MODES end; updateModeDisplay() end)
-    nextBtn.MouseButton1Click:Connect(function() state.currentModeIndex = state.currentModeIndex + 1; if state.currentModeIndex > #MODES then state.currentModeIndex = 1 end; updateModeDisplay() end)
-    updateModeDisplay()
-
-    UI.toggleButton.MouseButton1Click:Connect(function() if state.active then stopPartController() else startPartController() end end)
-    updatePlayStopButtonVisuals()
-    
-    closeBtn.MouseButton1Click:Connect(function()
-        _G.fullRestore_PartController()
-        ScreenGui:Destroy()
-    end)
-    
-    local isMinimized = false; local originalSize = MainFrame.Size; local minimizedSize = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, TitleBar.Size.Y.Offset)
-    minimizeBtn.MouseButton1Click:Connect(function()
-        isMinimized = not isMinimized; ContentFrame.Visible = not isMinimized; local targetSize = isMinimized and minimizedSize or originalSize
-        TweenService:Create(MainFrame, TweenInfo.new(0.2), {Size = targetSize}):Play()
-    end)
-    
-    log("GUI Berhasil Dibuat!")
-
-    task.spawn(function()
-        scan()
-        task.wait(0.2)
-        if #state.parts > 0 then
-            startPartController()
-        end
-    end)
-
-    print("Part Controller GUI Initialized.")
-end
 
 
 -- Ensure cleanup restores Animate state and clears playback flag
