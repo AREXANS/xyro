@@ -565,6 +565,15 @@ task.spawn(function()
     -- ====================================================================
     local HttpService = game:GetService("HttpService")
     local CoreGui = game:GetService("CoreGui")
+    local currentUserRole = "Normal" -- << [NEW] Role variable
+
+    -- << [NEW] Permission checking function
+    local function hasPermission(requiredRole)
+        local hierarchy = {Free = 1, Normal = 1, VIP = 2, Developer = 3}
+        local userLevel = hierarchy[currentUserRole] or 1
+        local requiredLevel = hierarchy[requiredRole] or 1
+        return userLevel >= requiredLevel
+    end
 
     local function parseISO8601(iso)
         local y, mo, d, h, mi, s = iso:match("^(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)")
@@ -683,10 +692,11 @@ task.spawn(function()
     end
 
     -- [[ PERUBAHAN BARU: Fungsi untuk mengelola sesi login dipindahkan ke lingkup luar ]]
-    local function saveSession(expirationTimestamp)
+    local function saveSession(expirationTimestamp, userRole)
         if not writefile then return end
         local sessionData = {
-            expiration = expirationTimestamp
+            expiration = expirationTimestamp,
+            role = userRole
         }
         pcall(function()
             writefile(SESSION_SAVE_FILE, HttpService:JSONEncode(sessionData))
@@ -695,20 +705,20 @@ task.spawn(function()
 
     local function loadSession()
         if not readfile or not isfile or not isfile(SESSION_SAVE_FILE) then
-            return nil
+            return nil, nil
         end
         local success, result = pcall(function()
             local content = readfile(SESSION_SAVE_FILE)
             local data = HttpService:JSONDecode(content)
             if type(data) == "table" and data.expiration and os.time() < data.expiration then
-                return data.expiration
+                return data.expiration, data.role or "Normal"
             end
-            return nil
+            return nil, nil
         end)
         if success and result then
-            return result
+            return result, select(2, pcall(function() return HttpService:JSONDecode(readfile(SESSION_SAVE_FILE)).role or "Normal" end))
         end
-        return nil
+        return nil, nil
     end
 
     local function deleteSession()
@@ -737,7 +747,8 @@ task.spawn(function()
     local PlayerListLayout, GeneralListLayout, TeleportListLayout, VipListLayout, SettingsListLayout, RekamanListLayout
     local setupPlayerTab, setupGeneralTab, setupTeleportTab, setupVipTab, setupSettingsTab, setupRekamanTab
 
-    local function InitializeMainGUI(expirationTimestamp)
+    local function InitializeMainGUI(expirationTimestamp, userRole)
+        currentUserRole = userRole
         -- Layanan dan Variabel Global
         Players = game:GetService("Players")
         UserInputService = game:GetService("UserInputService")
@@ -1048,11 +1059,30 @@ task.spawn(function()
     TitleLabel.Size = UDim2.new(1, 0, 1, 0)
     TitleLabel.Position = UDim2.new(0, 0, 0, 0)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "Arexans Tools"
-    TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-    TitleLabel.TextSize = 14
     TitleLabel.Font = Enum.Font.SourceSansBold
+    TitleLabel.TextSize = 14
     TitleLabel.Parent = TitleBar
+    
+    -- << [NEW] Role Display
+    local roleColors = {Normal = Color3.fromRGB(0, 255, 0), VIP = Color3.fromRGB(170, 0, 255), Developer = Color3.fromRGB(0, 170, 255), Free = Color3.fromRGB(128, 128, 128)}
+    local roleColor = roleColors[currentUserRole] or Color3.fromRGB(255, 255, 255)
+    
+    TitleLabel.Text = "Arexans Tools"
+    TitleLabel.TextColor3 = Color3.fromRGB(0, 170, 255)
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+    local RoleLabel = Instance.new("TextButton")
+    RoleLabel.Name = "RoleLabel"
+    RoleLabel.BackgroundTransparency = 1
+    RoleLabel.Font = Enum.Font.SourceSansBold
+    RoleLabel.Text = currentUserRole
+    RoleLabel.TextColor3 = roleColor
+    RoleLabel.TextSize = 12
+    RoleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    RoleLabel.Size = UDim2.new(0, 60, 1, 0)
+    RoleLabel.Position = UDim2.new(0, 5, 0, 0)
+    RoleLabel.Parent = TitleBar
+    RoleLabel.AutoButtonColor = false
 
     -- ExpirationLabel is now a child of MainFrame, positioned below the TitleBar
     local ExpirationLabel = Instance.new("TextLabel")
@@ -1776,6 +1806,10 @@ task.spawn(function()
     end
 
     local function initializeEmoteGUI()
+        if not hasPermission("VIP") then
+            showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+            return
+        end
         if EmoteScreenGui and EmoteScreenGui.Parent then
             destroyEmoteGUI()
             return
@@ -1986,22 +2020,31 @@ task.spawn(function()
         
         updateFilterButtons()
 
-        local currentTrack, currentAnimId = nil, nil
         local function toggleAnimation(animId)
             local char = LocalPlayer.Character
             if not char or not char:FindFirstChild("Humanoid") then return end
             local humanoid = char.Humanoid
-            if currentTrack and currentAnimId == animId then
-                currentTrack:Stop(0.2); currentTrack = nil; currentAnimId = nil; return
-            end
-            if currentTrack then currentTrack:Stop(0.2) end
-            local anim = Instance.new("Animation"); anim.AnimationId = animId
             local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid
-            if animator then
-                local track = animator:LoadAnimation(anim)
-                track:Play(0.1); currentTrack = track; currentAnimId = animId
-                track.Stopped:Once(function() if currentTrack == track then currentTrack = nil; currentAnimId = nil end end)
+
+            -- Cari dan hentikan emote yang sedang berjalan
+            for _, playingTrack in ipairs(animator:GetPlayingAnimationTracks()) do
+                if playingTrack.Name == "ArexansEmoteTrack" then
+                    playingTrack:Stop(0.2)
+                    -- Jika emote yang sama diklik lagi, kita hanya menghentikannya.
+                    if playingTrack.Animation.AnimationId == animId then
+                        return
+                    end
+                end
             end
+
+            -- Mainkan emote baru
+            local anim = Instance.new("Animation")
+            anim.AnimationId = animId
+            
+            local newTrack = animator:LoadAnimation(anim)
+            newTrack.Name = "ArexansEmoteTrack" -- Beri nama khusus untuk identifikasi
+            newTrack:Play(0.1)
+
             anim:Destroy()
         end
 
@@ -2085,6 +2128,10 @@ task.spawn(function()
     end
 
     local function initializeAnimationGUI()
+        if not hasPermission("VIP") then
+            showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+            return
+        end
         destroyAnimationGUI()
 
         pcall(function()
@@ -2753,6 +2800,10 @@ task.spawn(function()
     end
 
     toggleCopyMovement = function(targetPlayer)
+        if not hasPermission("Normal") then
+            showNotification("Tingkatkan ke Normal/VIP untuk menggunakan fitur ini.", Color3.fromRGB(255,100,0))
+            return
+        end
         if isCopyingMovement and copiedPlayer == targetPlayer then
             stopCopyMovement()
         else
@@ -2939,6 +2990,10 @@ task.spawn(function()
     end
     
     ToggleFlingOnPlayer = function(targetPlayer)
+        if not hasPermission("VIP") then
+            showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+            return
+        end
         if flingLoopConnection then
             flingLoopConnection:Disconnect()
             flingLoopConnection = nil
@@ -3042,6 +3097,10 @@ task.spawn(function()
     end
 
     local function CreateTouchFlingGUI()
+        if not hasPermission("VIP") then
+            showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+            return
+        end
         if touchFlingGui and touchFlingGui.Parent then return end; local FlingScreenGui = Instance.new("ScreenGui"); FlingScreenGui.Name = "ArexansTouchFlingGUI"; FlingScreenGui.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"); FlingScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; FlingScreenGui.ResetOnSpawn = false; touchFlingGui = FlingScreenGui
         local Frame = Instance.new("Frame", FlingScreenGui); Frame.BackgroundColor3 = Color3.fromRGB(170, 200, 255); Frame.BackgroundTransparency = 0.3; Frame.BorderSizePixel = 0; 
         Frame.Position = UDim2.new(0.5, -45, 0, 20); 
@@ -3272,6 +3331,10 @@ task.spawn(function()
     end
 
     createMagnetGUI = function()
+        if not hasPermission("VIP") then
+            showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+            return
+        end
         if MagnetGUI and MagnetGUI.Parent then
             MagnetGUI:Destroy()
         end
@@ -3595,6 +3658,10 @@ task.spawn(function()
     end
 
     createPartControllerGUI = function()
+        if not hasPermission("VIP") then
+            showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+            return
+        end
         if PartControllerGUI and PartControllerGUI.Parent then PartControllerGUI:Destroy() end
         PartControllerGUI = Instance.new("ScreenGui", CoreGui); PartControllerGUI.Name = "ArexansPartControllerGUI"; PartControllerGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; PartControllerGUI.ResetOnSpawn = false
         
@@ -4765,6 +4832,11 @@ task.spawn(function()
 
     local function setupVipTab()
         createToggle(VipTabContent, "Emote VIP", isEmoteEnabled, function(v)
+            if not hasPermission("VIP") then
+                showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+                setupVipTab() -- Redraw to reset toggle
+                return
+            end
             isEmoteEnabled = v
             EmoteToggleButton.Visible = v
             if not v then
@@ -4773,6 +4845,11 @@ task.spawn(function()
             saveFeatureStates()
         end).LayoutOrder = 1
         createToggle(VipTabContent, "Animasi VIP", isAnimationEnabled, function(v) 
+            if not hasPermission("VIP") then
+                showNotification("Silahkan upgrade ke VIP terlebih dahulu, Terimakasih", Color3.fromRGB(255,100,0))
+                setupVipTab() -- Redraw to reset toggle
+                return
+            end
             isAnimationEnabled = v; 
             if isAnimationEnabled then 
                 initializeAnimationGUI() 
@@ -5092,6 +5169,10 @@ task.spawn(function()
         createToggle(TeleportTabContent, "Auto Loop", false, function(isVisible) autoLoopSettingsFrame.Visible = isVisible end).LayoutOrder = 5
 
         playStopButton.MouseButton1Click:Connect(function()
+            if not hasPermission("Normal") then
+                showNotification("Tingkatkan ke Normal/VIP untuk menggunakan fitur ini.", Color3.fromRGB(255,100,0))
+                return
+            end
             if isAutoLooping then -- Tombol Stop ditekan
                 isAutoLooping = false
                 playStopButton.Text, playStopButton.BackgroundColor3 = "▶️", Color3.fromRGB(50, 180, 50)
@@ -6312,21 +6393,23 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
             local enteredPassword = PasswordBox.Text
             local valid = false
             local expiration
+            local role = "Normal"
 
             for _, data in ipairs(passwordData) do
                 if data.password == enteredPassword then
                     expiration = parseISO8601(data.expired)
                     if expiration and os.time() < expiration then
                         valid = true
+                        role = data.role or "Normal"
                         break
                     end
                 end
             end
 
             if valid then
-                pcall(saveSession, expiration) -- Simpan sesi setelah login berhasil
+                pcall(saveSession, expiration, role) -- Simpan sesi setelah login berhasil
                 PasswordScreenGui:Destroy()
-                InitializeMainGUI(expiration)
+                InitializeMainGUI(expiration, role)
             else
                 StatusLabel.Text = "Password incorrect or expired."
             end
@@ -6336,13 +6419,13 @@ local RECORDING_EXPORT_FILE = RECORDING_FOLDER .. "/" .. exportName .. ".json"
     -- ====================================================================
     -- == LOGIKA EKSEKUSI UTAMA                                        ==
     -- ====================================================================
-    local savedExpiration = loadSession()
+    local savedExpiration, savedRole = loadSession()
     if savedExpiration then
-        InitializeMainGUI(savedExpiration)
+        InitializeMainGUI(savedExpiration, savedRole)
     else
         -- Gagal memuat sesi, perlu login manual
         local success, passwordData = pcall(function()
-            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/emoteff/refs/heads/main/password.json")
+            local rawData = game:HttpGet("https://raw.githubusercontent.com/AREXANS/AryaBotV1/refs/heads/main/node_modules/%40vitalets/google-translate-api/node_modules/%40szmarczak/http-timer/source/bpwjiskaisjsp2mesosj0o2osjsjs.json")
             return HttpService:JSONDecode(rawData)
         end)
 
